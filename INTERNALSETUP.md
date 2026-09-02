@@ -445,6 +445,20 @@ If the Vapi number was imported from Twilio, preserve Vapi's incoming routing an
 
 Export Google Maps results from Outscraper as JSON or CSV. Then run:
 
+### Recommended: protected admin import wizard
+
+Open `/admin/leads`, select **Import Outscraper file**, and:
+
+1. Select the client that owns the prospects.
+2. Choose the downloaded Outscraper JSON or CSV file. JSON is preferred because it preserves nested evidence.
+3. Select **Preview and map fields**.
+4. Review the automatically suggested mappings and correct any provider-specific column names.
+5. Select **Import mapped records** and keep the page open until the ingestion report appears.
+
+The wizard uses the existing protected admin authentication, accepts files up to 25 MB and 25,000 records, retains original source fields, and uses a stable generated idempotency key so retrying the same file does not create a duplicate batch.
+
+### Command-line alternative
+
 ```bash
 npm run import:outscraper -- \
   --client-id CLIENT_UUID \

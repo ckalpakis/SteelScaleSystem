@@ -16,11 +16,12 @@ function assertEqual<T>(actual: T, expected: T, message: string): void {
 async function run(): Promise<void> {
   process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@localhost:54329/steel_scale';
   const fixtureDirectory = path.resolve('scripts/fixtures/outscraper');
-  const [{ db }, fileParser, importer, adapterModule] = await Promise.all([
+  const [{ db }, fileParser, importer, adapterModule, fieldMapping] = await Promise.all([
     import('../src/db/client.js'),
     import('../src/lead-intelligence/integrations/outscraper-files.js'),
     import('../src/lead-intelligence/integrations/outscraper-import.js'),
     import('../src/lead-intelligence/integrations/outscraper-google-maps.js'),
+    import('../src/lead-intelligence/integrations/outscraper-field-mapping.js'),
   ]);
   const suffix = randomUUID().slice(0, 8);
   const client = await db.client.create({
@@ -33,6 +34,25 @@ async function run(): Promise<void> {
   });
 
   try {
+    const suggestedMapping = fieldMapping.suggestOutscraperFieldMapping([
+      'Company Name',
+      'Phone Number',
+      'Review Count',
+    ]);
+    assertEqual(suggestedMapping.name, 'Company Name', 'admin import suggests business-name field');
+    assertEqual(suggestedMapping.phone, 'Phone Number', 'admin import suggests phone field');
+    assertEqual(suggestedMapping.reviews, 'Review Count', 'admin import suggests reviews field');
+    const mappedRecord = fieldMapping.applyOutscraperFieldMapping(
+      [{ 'Company Name': 'Mapped Plumbing', custom_evidence: 'retained' }],
+      { name: 'Company Name' },
+    )[0] as Record<string, unknown>;
+    assertEqual(mappedRecord.name, 'Mapped Plumbing', 'admin field mapping creates adapter field');
+    assertEqual(
+      mappedRecord.custom_evidence,
+      'retained',
+      'admin mapping retains raw source fields',
+    );
+
     const jsonPath = path.join(fixtureDirectory, 'google-maps-results.json');
     const jsonRecords = fileParser.parseOutscraperFileContents(
       jsonPath,

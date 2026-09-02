@@ -12,8 +12,10 @@ import {
 } from '../lead-intelligence/admin-dashboard.js';
 import { scoreLead } from '../lead-intelligence/scoring/service.js';
 import { adminLayout, escapeHtml } from '../utils/html.js';
+import { adminOutscraperImportRouter } from './admin-outscraper-import.js';
 
 export const adminLeadIntelligenceRouter = Router();
+adminLeadIntelligenceRouter.use('/import', adminOutscraperImportRouter);
 
 function value(input: unknown): string | undefined {
   return typeof input === 'string' && input.trim() ? input.trim() : undefined;
@@ -186,7 +188,7 @@ adminLeadIntelligenceRouter.get('/', async (request, response, next) => {
       adminLayout(
         'Lead Intelligence',
         `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav>
-      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><a class="button secondary" href="/admin/leads/export.csv?${exportQuery.toString()}">Export current view</a></header>
+      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><div class="header-actions"><a class="button" href="/admin/leads/import">Import Outscraper file</a><a class="button secondary" href="/admin/leads/export.csv?${exportQuery.toString()}">Export current view</a></div></header>
       ${renderMetrics(metrics)}${renderFilters(request, clients)}
       <section class="panel table-panel intelligence-table"><div class="table-caption"><strong>${rows.length} prospects</strong><span>Current scores and latest evidence</span></div>${renderRows(rows)}</section>`,
       ),
