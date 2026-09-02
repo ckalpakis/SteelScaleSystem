@@ -1,0 +1,49 @@
+[
+  {
+    "zpid": "2064142765",
+    "propertyUrl": "https://www.zillow.com/homedetails/example/2064142765_zpid/",
+    "listingAddress": {
+      "street": "123 Oak Street",
+      "city": "Pittsburgh",
+      "state": "PA",
+      "zipCode": "15222",
+      "full": "123 Oak Street, Pittsburgh, PA 15222"
+    },
+    "coordinates": {
+      "latitude": 40.4406,
+      "longitude": -79.9959
+    },
+    "listingPrice": {
+      "amount": 685000,
+      "currency": "USD",
+      "formatted": "$685,000"
+    },
+    "bedrooms": 4,
+    "bathrooms": 3.5,
+    "livingArea": 2840,
+    "listingStatus": "forSale",
+    "onMarketDate": "2026-09-02T00:00:00.000Z",
+    "listingPhotos": [
+      {
+        "url": "https://photos.example/oak-1.jpg",
+        "caption": null
+      }
+    ],
+    "agent": {
+      "name": "Sarah Thompson",
+      "phoneNumber": "+14125550142",
+      "email": "sarah@example.com",
+      "profileUrl": "https://agents.example/sarah-thompson",
+      "headshotUrl": "https://images.example/sarah.jpg",
+      "website": "https://sarahthompson.example",
+      "instagram": "https://instagram.com/sarahhomes",
+      "facebook": "https://facebook.com/sarahhomes",
+      "tiktok": "https://tiktok.com/@sarahhomes",
+      "licenseNumber": "PA-RS123456"
+    },
+    "broker": {
+      "name": "Example Realty"
+    },
+    "scrapedAt": "2026-09-02T12:00:00.000Z"
+  }
+]

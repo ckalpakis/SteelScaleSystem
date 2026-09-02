@@ -1,0 +1,37 @@
+{
+  "templateVersion": "steel-scale-outscraper-v1",
+  "provider": "outscraper_google_maps",
+  "endpoint": "https://api.outscraper.com/maps/search",
+  "request": {
+    "query": [
+      "water damage restoration, Pittsburgh, PA, USA",
+      "fire damage restoration, Pittsburgh, PA, USA",
+      "mold remediation, Pittsburgh, PA, USA",
+      "water damage restoration, Philadelphia, PA, USA",
+      "fire damage restoration, Philadelphia, PA, USA",
+      "mold remediation, Philadelphia, PA, USA",
+      "water damage restoration, Harrisburg, PA, USA",
+      "fire damage restoration, Harrisburg, PA, USA",
+      "mold remediation, Harrisburg, PA, USA",
+      "water damage restoration, Erie, PA, USA",
+      "fire damage restoration, Erie, PA, USA",
+      "mold remediation, Erie, PA, USA"
+    ],
+    "limit": 100,
+    "totalLimit": 500,
+    "dropDuplicates": true,
+    "language": "en",
+    "region": "US",
+    "async": true,
+    "fields": "query,name,type,category,subtypes,services,phone,site,full_address,street,city,state,state_code,postal_code,country,country_code,latitude,longitude,rating,reviews,place_id,google_id,cid,business_status,working_hours,reservation_links,booking_appointment_link,verified,owner_id,owner_title,owner_link,location_link,photos_count,description,about,area_service"
+  },
+  "export": {
+    "format": "json",
+    "keepNestedValues": true
+  },
+  "postImport": {
+    "minimumReviewsForReviewQueue": 10,
+    "websiteAuditConcurrency": 3,
+    "offer": "VOICE_AI"
+  }
+}

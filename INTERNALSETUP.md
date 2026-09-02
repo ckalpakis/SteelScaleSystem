@@ -445,6 +445,8 @@ If the Vapi number was imported from Twilio, preserve Vapi's incoming routing an
 
 Export Google Maps results from Outscraper as JSON or CSV. Then run:
 
+Use [`LEAD_SOURCE_TEMPLATES.md`](./LEAD_SOURCE_TEMPLATES.md) for the ready-to-copy Outscraper search plan, Apify Zillow Search → Detail templates, recommended limits, and the accepted real-estate output contract.
+
 ### Recommended: protected admin import wizard
 
 Open `/admin/leads`, select **Import Outscraper file**, and:
@@ -470,6 +472,18 @@ npm run import:outscraper -- \
 The idempotency key identifies that import. Reusing it intentionally returns the existing ingestion run instead of duplicating the operation. Use a meaningful stable key for the same source batch; use a new key for a genuinely new export.
 
 The command reports received, created, updated, duplicate, rejected, and signal counts. Raw provider evidence is retained separately from canonical business data.
+
+### AI-assisted lead analysis
+
+After importing, enriching, and scoring leads:
+
+1. Open `/admin/leads`.
+2. Apply filters if you want the analysis limited to a client, offer, state, niche, or score range.
+3. Select **Analyze top leads with AI**.
+4. Wait for the report. The system sends at most 25 scored prospects and displays up to 10 ranked recommendations.
+5. Open a prospect to review the underlying deterministic score and source evidence before outreach.
+
+The analyst uses the existing `OPENAI_API_KEY`. Optionally set `LEAD_ANALYST_MODEL`; otherwise it uses `LLM_MODEL`, followed by the application's default model. The AI writes fit summaries, sales angles, notes, and evidence warnings. It does not change numeric scores or primary offers, contact prospects, or grant permission to text.
 
 ## 17. Website Intelligence enrichment
 

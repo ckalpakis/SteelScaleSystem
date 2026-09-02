@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { IntelligenceOffer } from '@prisma/client';
 
 import { db } from '../db/client.js';
+import { analyzeLeadList } from '../lead-intelligence/analyst/service.js';
 import { auditBusinessWebsite } from '../lead-intelligence/enrichment/website-audit.js';
 import {
   loadLeadIntelligenceDashboard,
@@ -170,6 +171,14 @@ function renderRows(rows: DashboardProspect[]): string {
     .join('')}</tbody></table></div>`;
 }
 
+function preservedQuery(request: Request): string {
+  const query = new URLSearchParams();
+  for (const [key, rawValue] of Object.entries(request.query)) {
+    if (typeof rawValue === 'string') query.set(key, rawValue);
+  }
+  return query.toString();
+}
+
 adminLeadIntelligenceRouter.get('/', async (request, response, next) => {
   try {
     const filters = filtersFrom(request);
@@ -180,17 +189,41 @@ adminLeadIntelligenceRouter.get('/', async (request, response, next) => {
         orderBy: { businessName: 'asc' },
       }),
     ]);
-    const exportQuery = new URLSearchParams();
-    for (const [key, rawValue] of Object.entries(request.query)) {
-      if (typeof rawValue === 'string') exportQuery.set(key, rawValue);
-    }
+    const currentQuery = preservedQuery(request);
     response.send(
       adminLayout(
         'Lead Intelligence',
         `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav>
-      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><div class="header-actions"><a class="button" href="/admin/leads/import">Import Outscraper file</a><a class="button secondary" href="/admin/leads/export.csv?${exportQuery.toString()}">Export current view</a></div></header>
+      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><div class="header-actions"><a class="button" href="/admin/leads/import">Import Outscraper file</a><form method="post" action="/admin/leads/analyze?${escapeHtml(currentQuery)}"><button type="submit">Analyze top leads with AI</button></form><a class="button secondary" href="/admin/leads/export.csv?${escapeHtml(currentQuery)}">Export current view</a></div></header>
       ${renderMetrics(metrics)}${renderFilters(request, clients)}
       <section class="panel table-panel intelligence-table"><div class="table-caption"><strong>${rows.length} prospects</strong><span>Current scores and latest evidence</span></div>${renderRows(rows)}</section>`,
+      ),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminLeadIntelligenceRouter.post('/analyze', async (request, response, next) => {
+  try {
+    const { rows } = await loadLeadIntelligenceDashboard(filtersFrom(request));
+    const report = await analyzeLeadList(rows);
+    const byLeadId = new Map(rows.map((row) => [row.leadId, row]));
+    const cards = report.rankings
+      .map((entry) => {
+        const row = byLeadId.get(entry.leadId);
+        if (!row) return '';
+        const notes = entry.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('');
+        const risks = entry.risks.length
+          ? `<div class="analyst-risks"><strong>Check before outreach</strong><ul>${entry.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join('')}</ul></div>`
+          : '';
+        return `<article class="panel analyst-card"><div class="analyst-rank">#${entry.rank}</div><div><div class="analyst-title"><div><a class="primary-link" href="/admin/leads/${row.leadId}">${escapeHtml(row.name)}</a><span>${escapeHtml(row.location)} · ${escapeHtml(row.niche ?? 'Uncategorized')}</span></div><div class="score-cell ${scoreClass(row.scoreBand)}"><strong>${row.score ?? '—'}</strong><span>${escapeHtml(row.scoreBand ?? 'UNSCORED')}</span></div></div><p class="analyst-summary">${escapeHtml(entry.fitSummary)}</p><div class="pitch-angle"><span>Recommended angle</span><strong>${escapeHtml(entry.salesAngle)}</strong></div><h2>Why this lead ranks highly</h2><ul>${notes}</ul>${risks}</div></article>`;
+      })
+      .join('');
+    response.send(
+      adminLayout(
+        'AI Lead Analysis',
+        `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads?${escapeHtml(preservedQuery(request))}">← Prospecting dashboard</a><h1>AI lead analysis</h1><p>${report.analyzedCount} scored prospects reviewed · ${report.rankings.length} recommendations · ${escapeHtml(report.model)}</p></div><span class="badge neutral">Generated ${escapeHtml(report.generatedAt.toLocaleString())}</span></header><div class="notice">Numeric scores and primary offers remain deterministic. AI generated the sales interpretation and notes from stored evidence.</div><section class="analyst-results">${cards}</section>`,
       ),
     );
   } catch (error) {

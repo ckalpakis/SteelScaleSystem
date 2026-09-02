@@ -71,7 +71,16 @@ export class ApifyRealEstateAdapter implements RealEstateListingAdapter<ApifyRea
     const errors: string[] = [];
     if (!this.getExternalIdentifier(payload)) errors.push('External listing ID is required');
     const record = payload as Record<string, unknown>;
-    if (!text(record.address ?? record.streetAddress ?? record.street_address)) {
+    const listingAddress = object(record.listingAddress);
+    if (
+      !text(
+        record.address ??
+          record.streetAddress ??
+          record.street_address ??
+          listingAddress.full ??
+          listingAddress.street,
+      )
+    ) {
       errors.push('Listing address is required');
     }
     return errors.length ? { valid: false, errors } : { valid: true, value: record };
@@ -79,6 +88,10 @@ export class ApifyRealEstateAdapter implements RealEstateListingAdapter<ApifyRea
 
   normalize(payload: ApifyRealEstatePayload) {
     const addressObject = object(payload.address);
+    const listingAddress = object(payload.listingAddress);
+    const coordinates = object(payload.coordinates);
+    const listingPrice = object(payload.listingPrice);
+    const brokerObject = object(payload.broker);
     const agentObject = object(payload.agent ?? payload.listingAgent ?? payload.attributionInfo);
     const fullName = text(
       agentObject.name ??
@@ -95,7 +108,13 @@ export class ApifyRealEstateAdapter implements RealEstateListingAdapter<ApifyRea
             fullName: fullName ?? [firstName, lastName].filter(Boolean).join(' '),
             firstName,
             lastName,
-            phone: text(agentObject.phone ?? payload.agentPhone ?? payload.agent_phone),
+            phone: text(
+              agentObject.phone ??
+                agentObject.phoneNumber ??
+                agentObject.agentPhoneNumber ??
+                payload.agentPhone ??
+                payload.agent_phone,
+            ),
             email: text(agentObject.email ?? payload.agentEmail ?? payload.agent_email),
             profileUrl: text(
               agentObject.profileUrl ?? payload.agentProfileUrl ?? payload.agent_profile_url,
@@ -112,6 +131,7 @@ export class ApifyRealEstateAdapter implements RealEstateListingAdapter<ApifyRea
             tiktokUrl: social(payload, agentObject, 'tiktok'),
             brokerage: text(
               agentObject.brokerage ??
+                brokerObject.name ??
                 payload.brokerage ??
                 payload.brokerName ??
                 payload.broker_name,
@@ -128,25 +148,57 @@ export class ApifyRealEstateAdapter implements RealEstateListingAdapter<ApifyRea
         (typeof payload.address === 'string' ? payload.address : undefined) ??
           payload.streetAddress ??
           payload.street_address ??
-          addressObject.streetAddress,
+          addressObject.streetAddress ??
+          listingAddress.full ??
+          listingAddress.street,
       ),
-      city: text(payload.city ?? addressObject.city),
-      state: text(payload.state ?? payload.stateCode ?? addressObject.state),
+      city: text(payload.city ?? addressObject.city ?? listingAddress.city),
+      state: text(
+        payload.state ?? payload.stateCode ?? addressObject.state ?? listingAddress.state,
+      ),
       postalCode: text(
-        payload.zipcode ?? payload.zip ?? payload.postalCode ?? addressObject.zipcode,
+        payload.zipcode ??
+          payload.zip ??
+          payload.postalCode ??
+          addressObject.zipcode ??
+          listingAddress.zipCode,
       ),
-      latitude: number(payload.latitude ?? payload.lat ?? object(payload.latLong).latitude),
-      longitude: number(payload.longitude ?? payload.lng ?? object(payload.latLong).longitude),
-      price: number(payload.price ?? payload.listPrice ?? payload.list_price),
+      latitude: number(
+        payload.latitude ?? payload.lat ?? object(payload.latLong).latitude ?? coordinates.latitude,
+      ),
+      longitude: number(
+        payload.longitude ??
+          payload.lng ??
+          object(payload.latLong).longitude ??
+          coordinates.longitude,
+      ),
+      price: number(
+        payload.price ?? payload.listPrice ?? payload.list_price ?? listingPrice.amount,
+      ),
       bedrooms: number(payload.bedrooms ?? payload.beds),
       bathrooms: number(payload.bathrooms ?? payload.baths),
       squareFeet: number(payload.livingArea ?? payload.squareFeet ?? payload.sqft),
-      status: text(payload.status ?? payload.homeStatus ?? payload.listing_status),
-      listedAt: date(
-        payload.listedAt ?? payload.datePosted ?? payload.listing_date ?? payload.createdAt,
+      status: text(
+        payload.status ?? payload.homeStatus ?? payload.listing_status ?? payload.listingStatus,
       ),
-      images: images(payload.images ?? payload.photos ?? payload.imgSrc),
-      brokerage: agent?.brokerage ?? text(payload.brokerage ?? payload.brokerName),
+      listedAt: date(
+        payload.listedAt ??
+          payload.onMarketDate ??
+          payload.datePosted ??
+          payload.datePostedString ??
+          payload.listing_date ??
+          payload.createdAt,
+      ),
+      images: images(
+        payload.images ??
+          payload.photos ??
+          payload.listingPhotos ??
+          payload.photoUrls ??
+          payload.imgSrc ??
+          payload.mainImage,
+      ),
+      brokerage:
+        agent?.brokerage ?? text(payload.brokerage ?? payload.brokerName ?? brokerObject.name),
       agent,
     };
   }

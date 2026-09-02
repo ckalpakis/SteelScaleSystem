@@ -66,6 +66,47 @@ async function run(): Promise<void> {
     '123 oak street|raleigh|nc|27601',
     'cross-provider address identity normalized',
   );
+
+  const modernApifyPayload = {
+    zpid: 'modern-zillow-456',
+    propertyUrl: 'https://www.zillow.com/homedetails/456-River-Rd/456_zpid/',
+    listingAddress: {
+      street: '456 River Road',
+      city: 'Pittsburgh',
+      state: 'PA',
+      zipCode: '15222',
+      full: '456 River Road, Pittsburgh, PA 15222',
+    },
+    coordinates: { latitude: 40.4406, longitude: -79.9959 },
+    listingPrice: { amount: 685000 },
+    bedrooms: 4,
+    bathrooms: 3.5,
+    livingArea: 2840,
+    listingStatus: 'forSale',
+    onMarketDate: '2026-09-02T00:00:00.000Z',
+    listingPhotos: [{ url: 'https://images.example/modern-listing.jpg' }],
+    agent: {
+      name: 'Sarah Thompson',
+      phoneNumber: '+14125550142',
+      email: 'sarah@example.test',
+      licenseNumber: 'PA-RS123456',
+    },
+    broker: { name: 'Example Realty' },
+  };
+  const modernValidation = zillowAdapter.validate(modernApifyPayload);
+  assert(modernValidation.valid, 'modern nested Zillow/Apify payload validates');
+  const modernNormalized = zillowAdapter.normalize(modernValidation.value);
+  assertEqual(modernNormalized.address, '456 River Road, Pittsburgh, PA 15222', 'nested address');
+  assertEqual(modernNormalized.price, 685000, 'nested listing price');
+  assertEqual(modernNormalized.latitude, 40.4406, 'nested coordinates');
+  assertEqual(modernNormalized.images.length, 1, 'nested listing photos');
+  assertEqual(modernNormalized.agent?.phone, '+14125550142', 'nested agent phone');
+  assertEqual(modernNormalized.brokerage, 'Example Realty', 'nested brokerage');
+  assertEqual(
+    modernNormalized.listedAt?.toISOString(),
+    '2026-09-02T00:00:00.000Z',
+    'modern listing date',
+  );
   assert(!zillowAdapter.validate({ zpid: 'missing-address' }).valid, 'missing address rejected');
 
   const baseInput = {

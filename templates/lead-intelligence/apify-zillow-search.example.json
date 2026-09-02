@@ -1,0 +1,12 @@
+{
+  "searchUrls": [
+    {
+      "url": "PASTE_A_FULL_ZILLOW_SEARCH_URL_FOR_PITTSBURGH_SORTED_BY_NEWEST"
+    },
+    {
+      "url": "PASTE_A_FULL_ZILLOW_SEARCH_URL_FOR_PHILADELPHIA_SORTED_BY_NEWEST"
+    }
+  ],
+  "extractionMethod": "PAGINATION",
+  "resultsLimit": 50
+}

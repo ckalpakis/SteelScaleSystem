@@ -27,6 +27,7 @@ export const env = {
   VAPI_WEBHOOK_SECRET: process.env.VAPI_WEBHOOK_SECRET,
   LLM_PROVIDER: parseLlmProvider(process.env.LLM_PROVIDER),
   LLM_MODEL: process.env.LLM_MODEL,
+  LEAD_ANALYST_MODEL: process.env.LEAD_ANALYST_MODEL,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   GHL_API_KEY: process.env.GHL_API_KEY,
