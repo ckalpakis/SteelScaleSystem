@@ -20,6 +20,7 @@ function parseLlmProvider(value: string | undefined): 'openai' | 'anthropic' | '
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',
+  APP_URL: process.env.APP_URL,
   PORT: parsePort(process.env.PORT),
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,

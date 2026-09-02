@@ -1,9 +1,13 @@
 import { BookingSource, CallOutcome, CallType, Prisma, VoiceProvider } from '@prisma/client';
 
 import { db } from '../db/client.js';
+import { env } from '../config/env.js';
 import type { InternalBookingRequest } from '../types/booking.js';
 import { logger } from '../utils/logger.js';
 import { createBookingAttempt } from './bookings.js';
+import { getGhlCalendarAvailability } from './ghl.js';
+import { checkAvailabilityThroughZapier } from './zapier-availability.js';
+import type { CalendarAvailabilityResult } from '../types/availability.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -76,7 +80,7 @@ function renderSystemPrompt(
     .replaceAll('{business_name}', businessName)
     .replaceAll('{services}', services.join(', '));
 
-  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time.`;
+  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time. Before promising or creating an appointment, call check_availability for the caller's preferred time. If unavailable, offer the returned availableSlots and wait for the caller to choose one. Only call create_booking with a time confirmed available by the tool.`;
 }
 
 export async function buildAssistantResponse(message: JsonObject): Promise<JsonObject> {
@@ -104,6 +108,24 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
           {
             type: 'function',
             function: {
+              name: 'check_availability',
+              description:
+                'Check the live GHL calendar before promising an appointment. If unavailable, offer the returned nearby slots.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  preferredTime: {
+                    type: 'string',
+                    description: 'Future ISO 8601 timestamp including the business timezone offset',
+                  },
+                },
+                required: ['preferredTime'],
+              },
+            },
+          },
+          {
+            type: 'function',
+            function: {
               name: 'create_booking',
               description: 'Create a booking only after the caller confirms all collected details.',
               parameters: {
@@ -115,8 +137,7 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
                   service: { type: 'string' },
                   preferredTime: {
                     type: 'string',
-                    description:
-                      'Future ISO 8601 timestamp including the business timezone offset',
+                    description: 'Future ISO 8601 timestamp including the business timezone offset',
                   },
                 },
                 required: ['customerName', 'phoneNumber', 'address', 'service', 'preferredTime'],
@@ -128,6 +149,36 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
       serverMessages: ['status-update', 'end-of-call-report', 'tool-calls'],
     },
   };
+}
+
+function availabilityCalendar(context: VapiContext): string | undefined {
+  return context.client.destination?.ghlCalendarId ?? env.GHL_FALLBACK_CALENDAR_ID;
+}
+
+async function availabilityFor(
+  context: VapiContext,
+  preferredTime: string,
+): Promise<CalendarAvailabilityResult> {
+  if (context.client.destination?.destinationType === 'zapier') {
+    const webhookUrl = context.client.destination.zapierAvailabilityWebhookUrl;
+    if (!webhookUrl) throw new Error('No Zapier availability webhook is configured');
+    return checkAvailabilityThroughZapier({
+      clientId: context.client.id,
+      businessName: context.client.businessName,
+      webhookUrl,
+      preferredTime,
+      timezone: context.client.timezone,
+    });
+  }
+  const calendarId = availabilityCalendar(context);
+  if (!calendarId) throw new Error('No GHL calendar is configured for availability checks');
+  const availability = await getGhlCalendarAvailability({
+    calendarId,
+    clientId: context.client.id,
+    preferredTime,
+    timezone: context.client.timezone,
+  });
+  return { ...availability, source: 'ghl' };
 }
 
 async function contextForMessage(message: JsonObject): Promise<VapiContext | undefined> {
@@ -242,7 +293,7 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
     const name = stringValue(toolCall?.name) ?? stringValue(functionCall?.name);
     if (!id || !name) continue;
 
-    if (name !== 'create_booking') {
+    if (name !== 'create_booking' && name !== 'check_availability') {
       results.push({ name, toolCallId: id, result: JSON.stringify({ error: 'Unknown tool' }) });
       continue;
     }
@@ -271,6 +322,34 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
       });
       continue;
     }
+    if (name === 'check_availability') {
+      if (!preferredTime) {
+        results.push({
+          name,
+          toolCallId: id,
+          result: JSON.stringify({
+            requestedAvailable: false,
+            error: 'A preferred appointment time is required.',
+          }),
+        });
+        continue;
+      }
+      try {
+        const availability = await availabilityFor(context, preferredTime);
+        results.push({ name, toolCallId: id, result: JSON.stringify(availability) });
+      } catch (error) {
+        results.push({
+          name,
+          toolCallId: id,
+          result: JSON.stringify({
+            requestedAvailable: false,
+            availableSlots: [],
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        });
+      }
+      continue;
+    }
     const booking = parameters ? bookingFromTool(parameters, context, id) : undefined;
 
     if (!booking) {
@@ -280,6 +359,34 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
         result: JSON.stringify({ accepted: false, error: 'Missing required booking details' }),
       });
       continue;
+    }
+
+    if (!env.BOOKING_DELIVERY_DRY_RUN && context.client.destination) {
+      try {
+        const availability = await availabilityFor(context, booking.preferredTime);
+        if (!availability.requestedAvailable) {
+          results.push({
+            name,
+            toolCallId: id,
+            result: JSON.stringify({
+              accepted: false,
+              error: 'The requested time is not currently available.',
+              availableSlots: availability.availableSlots,
+            }),
+          });
+          continue;
+        }
+      } catch (error) {
+        results.push({
+          name,
+          toolCallId: id,
+          result: JSON.stringify({
+            accepted: false,
+            error: `Availability could not be confirmed: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+        });
+        continue;
+      }
     }
 
     const bookingResult = await createBookingAttempt(booking);

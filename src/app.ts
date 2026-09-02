@@ -9,6 +9,7 @@ import { cronRouter } from './routes/cron.js';
 import { internalBookingRouter } from './routes/internal-bookings.js';
 import { twilioWebhookRouter } from './routes/twilio-webhooks.js';
 import { vapiWebhookRouter } from './routes/vapi-webhooks.js';
+import { zapierAvailabilityRouter } from './routes/zapier-availability.js';
 import { logger } from './utils/logger.js';
 import { registerConfiguredLeadDiscoveryProviders } from './lead-intelligence/providers/register.js';
 
@@ -26,6 +27,7 @@ app.use('/internal/cron', cronRouter);
 app.use('/health', healthRouter);
 app.use('/chatbot', chatbotRouter);
 app.use('/internal/bookings', internalBookingRouter);
+app.use('/internal/availability', zapierAvailabilityRouter);
 app.use('/webhooks/twilio', twilioWebhookRouter);
 app.use('/webhooks/vapi', vapiWebhookRouter);
 app.use('/widget', express.static(path.resolve(process.cwd(), 'public')));

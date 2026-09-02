@@ -184,6 +184,7 @@ model Client {
   deliveryRecords      DeliveryRecord[]
   callQueueEntries     CallQueueEntry[]
   callAttempts         CallAttempt[]
+  availabilityChecks   AvailabilityCheck[]
 }
 
 model PipelineRun {
@@ -220,13 +221,34 @@ model PipelineRun {
 }
 
 model ClientDestination {
-  id               String          @id @default(uuid()) @db.Uuid
-  clientId         String          @unique @map("client_id") @db.Uuid
-  destinationType  DestinationType @map("destination_type")
-  zapierWebhookUrl String?         @map("zapier_webhook_url")
-  ghlCalendarId    String?         @map("ghl_calendar_id")
+  id                           String          @id @default(uuid()) @db.Uuid
+  clientId                     String          @unique @map("client_id") @db.Uuid
+  destinationType              DestinationType @map("destination_type")
+  zapierWebhookUrl             String?         @map("zapier_webhook_url")
+  zapierAvailabilityWebhookUrl String?         @map("zapier_availability_webhook_url")
+  ghlCalendarId                String?         @map("ghl_calendar_id")
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model AvailabilityCheck {
+  id                String    @id @default(uuid()) @db.Uuid
+  clientId          String    @map("client_id") @db.Uuid
+  requestId         String    @unique @map("request_id") @db.Uuid
+  callbackTokenHash String    @map("callback_token_hash")
+  requestedTime     DateTime  @map("requested_time")
+  timezone          String
+  status            String    @default("pending")
+  response          Json?
+  errorMessage      String?   @map("error_message")
+  expiresAt         DateTime  @map("expires_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([status, expiresAt])
 }
 
 model VoiceAgentConfig {

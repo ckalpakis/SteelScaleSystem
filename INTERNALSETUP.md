@@ -207,6 +207,7 @@ Keep `TWILIO_SMS_DRY_RUN=true`, `BOOKING_DELIVERY_DRY_RUN=true`, and `LLM_PROVID
 | ------------------------------ | --------------------- | ------------------------------------------------------------------------------ |
 | `DATABASE_URL`                 | Yes                   | PostgreSQL connection URL.                                                     |
 | `NODE_ENV`                     | Production            | Use `production` on Railway.                                                   |
+| `APP_URL`                      | Yes for Zapier checks | Public HTTPS application origin used to construct secure callback URLs.        |
 | `LOG_LEVEL`                    | No                    | Pino log level; normally `info`.                                               |
 | `PORT`                         | Local only            | Local port. Railway injects this automatically.                                |
 | `TWILIO_ACCOUNT_SID`           | For Twilio SMS        | Twilio project identity.                                                       |
@@ -376,10 +377,35 @@ In the appropriate GHL location:
 
 For clients using Zapier:
 
+Create two Zaps.
+
+The booking Zap:
+
 1. Create a Catch Hook trigger.
-2. Build the downstream calendar or CRM action.
+2. Build the downstream create-event or CRM action.
 3. Test with non-production contact data.
-4. Paste the HTTPS hook URL into the client's admin configuration.
+4. Paste its HTTPS hook URL into **Zapier webhook URL** in the client configuration.
+
+The availability Zap:
+
+1. Create a separate Catch Hook trigger.
+2. Use the client's calendar application to check `preferred_datetime` and find up to five nearby free slots in the supplied `timezone`.
+3. Add a final Webhooks by Zapier `POST` action whose URL is the incoming `callback_url` field.
+4. Send this JSON body from that final action:
+
+   ```json
+   {
+     "callback_token": "map the incoming callback_token",
+     "requested_available": true,
+     "available_slots": ["2026-09-03T16:30:00-04:00", "2026-09-03T17:00:00-04:00"]
+   }
+   ```
+
+5. Return all slot values as ISO 8601 timestamps with timezone offsets. Set `requested_available` to `false` when the requested time is occupied or outside working hours.
+6. Keep the Zap fast: Steel Scale waits up to 20 seconds for its callback.
+7. Paste the availability Catch Hook URL into **Zapier availability webhook URL** in the client configuration.
+
+A normal Zapier Catch Hook cannot customize its immediate HTTP response, so the availability Zap must use the provided secure callback URL. The callback token is unique, stored only as a hash, and expires after one minute. Set Railway `APP_URL` to the public origin, such as `https://steelscalesystem-production.up.railway.app`, without a trailing path.
 
 When primary booking delivery fails, Steel Scale retries and then uses the configured GHL fallback. If both fail, the booking remains flagged and Slack receives an operational alert.
 
@@ -421,6 +447,8 @@ Individual harmless website failures do not generate one Slack message each.
 10. Store that assistant ID and phone-number ID in the client's admin configuration.
 
 Make a controlled call and confirm the client's admin detail shows the resulting `CallLog`. Complete a controlled booking and verify its `BookingAttempt`.
+
+The dynamic assistant configuration now exposes both `check_availability` and `create_booking`. Zapier clients use their availability Zap; direct GHL clients use `GET /calendars/:calendarId/free-slots`. If the requested time is unavailable, the agent offers up to five nearby live slots. A result is reused for up to 60 seconds when the confirmed booking immediately follows the check. After deploying this version, make a test call requesting one unavailable time and confirm the agent offers alternatives instead of promising the appointment.
 
 ## 15. Configure Twilio
 

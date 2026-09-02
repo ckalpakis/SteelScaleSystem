@@ -21,6 +21,7 @@ type ClientForm = {
   missedCallSmsTemplate: string;
   destinationType: 'zapier' | 'ghl_fallback';
   zapierWebhookUrl: string;
+  zapierAvailabilityWebhookUrl: string;
   ghlCalendarId: string;
   voiceProvider: 'vapi' | 'retell';
   agentId: string;
@@ -37,6 +38,7 @@ const defaultForm: ClientForm = {
     "Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.",
   destinationType: 'zapier',
   zapierWebhookUrl: '',
+  zapierAvailabilityWebhookUrl: '',
   ghlCalendarId: '',
   voiceProvider: 'vapi',
   agentId: '',
@@ -60,6 +62,7 @@ function parseForm(request: Request): ClientForm {
     destinationType:
       bodyValue(request.body, 'destinationType') === 'ghl_fallback' ? 'ghl_fallback' : 'zapier',
     zapierWebhookUrl: bodyValue(request.body, 'zapierWebhookUrl'),
+    zapierAvailabilityWebhookUrl: bodyValue(request.body, 'zapierAvailabilityWebhookUrl'),
     ghlCalendarId: bodyValue(request.body, 'ghlCalendarId'),
     voiceProvider: bodyValue(request.body, 'voiceProvider') === 'retell' ? 'retell' : 'vapi',
     agentId: bodyValue(request.body, 'agentId'),
@@ -101,11 +104,16 @@ function validateForm(form: ClientForm): string[] {
   }
 
   if (form.destinationType === 'zapier') {
-    try {
-      const url = new URL(form.zapierWebhookUrl);
-      if (url.protocol !== 'https:') errors.push('Zapier webhook URL must use HTTPS.');
-    } catch {
-      errors.push('A valid Zapier webhook URL is required for the Zapier destination.');
+    for (const [rawUrl, label] of [
+      [form.zapierWebhookUrl, 'booking'],
+      [form.zapierAvailabilityWebhookUrl, 'availability'],
+    ] as const) {
+      try {
+        const url = new URL(rawUrl);
+        if (url.protocol !== 'https:') errors.push(`Zapier ${label} webhook URL must use HTTPS.`);
+      } catch {
+        errors.push(`A valid Zapier ${label} webhook URL is required.`);
+      }
     }
   } else if (!form.ghlCalendarId) {
     errors.push('GHL calendar ID is required for the GHL fallback destination.');
@@ -154,6 +162,7 @@ function renderForm(
             <option value="ghl_fallback"${selected(form.destinationType, 'ghl_fallback')}>GHL fallback</option>
           </select></label>
           <label>Zapier webhook URL<input type="url" name="zapierWebhookUrl" value="${e(form.zapierWebhookUrl)}" placeholder="https://hooks.zapier.com/..."></label>
+          <label>Zapier availability webhook URL<input type="url" name="zapierAvailabilityWebhookUrl" value="${e(form.zapierAvailabilityWebhookUrl)}" placeholder="https://hooks.zapier.com/..."><small>A separate Zap that checks the calendar and posts results to the supplied callback URL.</small></label>
           <label>GHL calendar ID<input name="ghlCalendarId" value="${e(form.ghlCalendarId)}"></label>
         </div>
       </section>
@@ -197,11 +206,15 @@ async function saveClient(form: ClientForm, clientId?: string): Promise<string> 
         clientId: client.id,
         destinationType: form.destinationType,
         zapierWebhookUrl: form.destinationType === 'zapier' ? form.zapierWebhookUrl : null,
+        zapierAvailabilityWebhookUrl:
+          form.destinationType === 'zapier' ? form.zapierAvailabilityWebhookUrl : null,
         ghlCalendarId: form.destinationType === 'ghl_fallback' ? form.ghlCalendarId : null,
       },
       update: {
         destinationType: form.destinationType,
         zapierWebhookUrl: form.destinationType === 'zapier' ? form.zapierWebhookUrl : null,
+        zapierAvailabilityWebhookUrl:
+          form.destinationType === 'zapier' ? form.zapierAvailabilityWebhookUrl : null,
         ghlCalendarId: form.destinationType === 'ghl_fallback' ? form.ghlCalendarId : null,
       },
     });
@@ -327,6 +340,7 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
       missedCallSmsTemplate: client.missedCallSmsTemplate,
       destinationType: client.destination?.destinationType ?? 'zapier',
       zapierWebhookUrl: client.destination?.zapierWebhookUrl ?? '',
+      zapierAvailabilityWebhookUrl: client.destination?.zapierAvailabilityWebhookUrl ?? '',
       ghlCalendarId: client.destination?.ghlCalendarId ?? '',
       voiceProvider: client.voiceAgentConfig?.provider ?? 'vapi',
       agentId: client.voiceAgentConfig?.agentId ?? '',
