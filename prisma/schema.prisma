@@ -1,0 +1,1022 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DestinationType {
+  zapier
+  ghl_fallback
+}
+
+enum VoiceProvider {
+  vapi
+  retell
+}
+
+enum CallType {
+  missed
+  answered_by_ai
+  answered_live
+}
+
+enum CallOutcome {
+  booked
+  no_answer
+  not_interested
+  voicemail
+}
+
+enum BookingSource {
+  voice
+  chatbot
+}
+
+enum BookingStatus {
+  pending
+  success
+  failed
+}
+
+enum SmsAttemptStatus {
+  pending
+  sent
+  failed
+}
+
+enum ChatRole {
+  user
+  assistant
+  tool
+}
+
+enum ChatSessionStatus {
+  active
+  booked
+}
+
+enum LeadLifecycleStatus {
+  new
+  qualified
+  disqualified
+  contacted
+  converted
+  archived
+}
+
+enum IntelligenceRunStatus {
+  pending
+  running
+  completed
+  failed
+  partially_completed
+}
+
+enum IntelligenceOffer {
+  VOICE_AI
+  REAL_ESTATE_VIDEO
+  WEBSITE
+  SEO_RANKING
+  REVIEWS
+}
+
+enum ProspectRelationshipStatus {
+  prospect
+  current_customer
+  former_customer
+  partner
+  do_not_target
+}
+
+enum OutreachDisposition {
+  not_contacted
+  ready
+  paused
+  contacted
+  replied
+  qualified
+  converted
+  do_not_contact
+  invalid
+}
+
+enum OutreachChannel {
+  phone
+  sms
+  email
+  social
+  other
+}
+
+enum OutreachDirection {
+  outbound
+  inbound
+}
+
+enum DeliveryDestination {
+  GHL
+  ZAPIER_WEBHOOK
+  CSV_EXPORT
+  CALL_QUEUE
+}
+
+enum DeliveryStatus {
+  pending
+  processing
+  delivered
+  failed
+}
+
+enum ConsentStatus {
+  unknown
+  granted
+  denied
+  opted_out
+}
+
+enum ProspectCallStatus {
+  not_called
+  no_answer
+  gatekeeper
+  owner_reached
+  interested
+  follow_up
+  demo_booked
+  not_interested
+  bad_fit
+  do_not_contact
+}
+
+model Client {
+  id                    String   @id @default(uuid()) @db.Uuid
+  businessName          String   @map("business_name")
+  phoneNumber           String   @unique @map("phone_number")
+  timezone              String
+  services              String[]
+  missedCallSmsTemplate String   @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  destination          ClientDestination?
+  voiceAgentConfig     VoiceAgentConfig?
+  callLogs             CallLog[]
+  bookingAttempts      BookingAttempt[]
+  chatSessions         ChatSession[]
+  leads                Lead[]
+  prospectBusinesses   ProspectBusiness[]
+  prospectContacts     ProspectContact[]
+  leadSourceRecords    LeadSourceRecord[]
+  leadSignals          LeadSignal[]
+  ingestionRuns        IngestionRun[]
+  enrichmentRuns       EnrichmentRun[]
+  websiteAudits        WebsiteAudit[]
+  realEstateListings   RealEstateListing[]
+  realEstateAgents     RealEstateAgent[]
+  listingSourceRecords RealEstateListingSourceRecord[]
+  scoreSnapshots       ScoreSnapshot[]
+  offerRecommendations OfferRecommendation[]
+  offerSuppressions    OfferSuppression[]
+  outreachActivities   OutreachActivity[]
+  pipelineRuns         PipelineRun[]
+  deliveryCampaigns    DeliveryCampaign[]
+  deliveryRecords      DeliveryRecord[]
+  callQueueEntries     CallQueueEntry[]
+  callAttempts         CallAttempt[]
+}
+
+model PipelineRun {
+  id                String                @id @default(uuid()) @db.Uuid
+  clientId          String                @map("client_id") @db.Uuid
+  source            String
+  campaignKey       String                @map("campaign_key")
+  idempotencyKey    String                @map("idempotency_key")
+  status            IntelligenceRunStatus @default(pending)
+  currentStage      String?               @map("current_stage")
+  startedAt         DateTime?             @map("started_at")
+  completedAt       DateTime?             @map("completed_at")
+  heartbeatAt       DateTime?             @map("heartbeat_at")
+  recordsDiscovered Int                   @default(0) @map("records_discovered")
+  recordsImported   Int                   @default(0) @map("records_imported")
+  recordsUpdated    Int                   @default(0) @map("records_updated")
+  duplicates        Int                   @default(0)
+  enriched          Int                   @default(0)
+  scored            Int                   @default(0)
+  hotLeads          Int                   @default(0) @map("hot_leads")
+  failures          Int                   @default(0)
+  errorSummaries    Json                  @default("[]") @map("error_summaries")
+  configuration     Json?
+  stageState        Json?                 @map("stage_state")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, source, idempotencyKey])
+  @@index([clientId, campaignKey, startedAt])
+  @@index([status, heartbeatAt])
+  @@index([source, completedAt])
+}
+
+model ClientDestination {
+  id               String          @id @default(uuid()) @db.Uuid
+  clientId         String          @unique @map("client_id") @db.Uuid
+  destinationType  DestinationType @map("destination_type")
+  zapierWebhookUrl String?         @map("zapier_webhook_url")
+  ghlCalendarId    String?         @map("ghl_calendar_id")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model VoiceAgentConfig {
+  id            String        @id @default(uuid()) @db.Uuid
+  clientId      String        @unique @map("client_id") @db.Uuid
+  provider      VoiceProvider
+  agentId       String        @map("agent_id")
+  phoneNumberId String        @map("phone_number_id")
+  systemPrompt  String        @default("You are the helpful phone agent for {business_name}. Services offered: {services}. Greet the caller, confirm what they need, and collect their full name, callback phone number, service address, requested service, and preferred appointment time. Read the details back for confirmation. Only after the caller confirms, call the create_booking tool. Never claim the booking is confirmed unless the tool returns accepted.") @map("system_prompt")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, agentId])
+  @@unique([provider, phoneNumberId])
+}
+
+model CallLog {
+  id               String            @id @default(uuid()) @db.Uuid
+  clientId         String            @map("client_id") @db.Uuid
+  providerCallId   String            @unique @map("provider_call_id")
+  callerNumber     String            @map("caller_number")
+  callType         CallType          @map("call_type")
+  durationSeconds  Int               @map("duration_seconds")
+  outcome          CallOutcome
+  rawPayload       Json              @map("raw_payload")
+  smsAttemptStatus SmsAttemptStatus? @map("sms_attempt_status")
+  outboundSmsSid   String?           @map("outbound_sms_sid")
+  smsErrorMessage  String?           @map("sms_error_message")
+  smsAttemptedAt   DateTime?         @map("sms_attempted_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+}
+
+model BookingAttempt {
+  id                       String           @id @default(uuid()) @db.Uuid
+  clientId                 String           @map("client_id") @db.Uuid
+  source                   BookingSource
+  status                   BookingStatus
+  destinationType          DestinationType? @map("destination_type")
+  deliveredDestinationType DestinationType? @map("delivered_destination_type")
+  primaryAttemptCount      Int              @default(0) @map("primary_attempt_count")
+  fallbackUsed             Boolean          @default(false) @map("fallback_used")
+  manualFollowUpRequired   Boolean          @default(false) @map("manual_follow_up_required")
+  externalBookingId        String?          @map("external_booking_id")
+  providerRequestId        String?          @unique @map("provider_request_id")
+  providerCallId           String?          @map("provider_call_id")
+  requestPayload           Json             @map("request_payload")
+  errorMessage             String?          @map("error_message")
+  completedAt              DateTime?        @map("completed_at")
+  createdAt                DateTime         @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([providerCallId])
+}
+
+model ChatSession {
+  id         String            @id @default(uuid()) @db.Uuid
+  clientId   String            @map("client_id") @db.Uuid
+  sessionKey String            @map("session_key")
+  status     ChatSessionStatus @default(active)
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  client   Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@unique([clientId, sessionKey])
+  @@index([updatedAt])
+}
+
+model ChatMessage {
+  id            String   @id @default(uuid()) @db.Uuid
+  chatSessionId String   @map("chat_session_id") @db.Uuid
+  role          ChatRole
+  content       String
+  toolCallId    String?  @map("tool_call_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId, createdAt])
+}
+
+model ProspectBusiness {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  clientId             String                     @map("client_id") @db.Uuid
+  name                 String
+  normalizedName       String                     @map("normalized_name")
+  website              String?
+  normalizedDomain     String?                    @map("normalized_domain")
+  phone                String?
+  normalizedPhone      String?                    @map("normalized_phone")
+  addressLine1         String?                    @map("address_line_1")
+  addressLine2         String?                    @map("address_line_2")
+  city                 String?
+  state                String?
+  normalizedCity       String?                    @map("normalized_city")
+  normalizedState      String?                    @map("normalized_state")
+  postalCode           String?                    @map("postal_code")
+  countryCode          String?                    @map("country_code")
+  latitude             Decimal?                   @db.Decimal(10, 7)
+  longitude            Decimal?                   @db.Decimal(10, 7)
+  googlePlaceId        String?                    @map("google_place_id")
+  googleCid            String?                    @map("google_cid")
+  category             String?
+  niche                String?
+  sourceCreatedAt      DateTime?                  @map("source_created_at")
+  firstSeenAt          DateTime                   @default(now()) @map("first_seen_at")
+  lastSeenAt           DateTime                   @default(now()) @map("last_seen_at")
+  websiteLastAuditedAt DateTime?                  @map("website_last_audited_at")
+  relationshipStatus   ProspectRelationshipStatus @default(prospect) @map("relationship_status")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+
+  client             Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contacts           ProspectContact[]
+  leads              Lead[]
+  sourceRecords      LeadSourceRecord[]
+  websiteAudits      WebsiteAudit[]
+  realEstateListings RealEstateListing[]
+  RealEstateAgent    RealEstateAgent?    @relation(fields: [realEstateAgentId], references: [id])
+  realEstateAgentId  String?             @db.Uuid
+
+  @@unique([clientId, googlePlaceId])
+  @@unique([clientId, googleCid])
+  @@index([clientId, normalizedDomain])
+  @@index([clientId, normalizedPhone])
+  @@index([clientId, normalizedName, normalizedCity, normalizedState])
+  @@index([clientId, category])
+  @@index([clientId, niche])
+  @@index([clientId, lastSeenAt])
+  @@index([clientId, websiteLastAuditedAt])
+  @@index([clientId, relationshipStatus])
+}
+
+model ProspectContact {
+  id              String    @id @default(uuid()) @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  businessId      String?   @map("business_id") @db.Uuid
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  fullName        String?   @map("full_name")
+  normalizedName  String?   @map("normalized_name")
+  title           String?
+  relationship    String?
+  phone           String?
+  phoneType       String?   @map("phone_type")
+  normalizedPhone String?   @map("normalized_phone")
+  email           String?
+  normalizedEmail String?   @map("normalized_email")
+  linkedinUrl     String?   @map("linkedin_url")
+  instagramUrl    String?   @map("instagram_url")
+  facebookUrl     String?   @map("facebook_url")
+  tiktokUrl       String?   @map("tiktok_url")
+  sourceCreatedAt DateTime? @map("source_created_at")
+  firstSeenAt     DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime  @default(now()) @map("last_seen_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  client        Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business      ProspectBusiness?  @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  primaryFor    Lead[]             @relation("LeadPrimaryContact")
+  sourceRecords LeadSourceRecord[]
+
+  @@index([clientId, businessId])
+  @@index([clientId, normalizedPhone])
+  @@index([clientId, normalizedEmail])
+  @@index([clientId, normalizedName])
+  @@index([clientId, lastSeenAt])
+}
+
+model Lead {
+  id               String              @id @default(uuid()) @db.Uuid
+  clientId         String              @map("client_id") @db.Uuid
+  businessId       String?             @map("business_id") @db.Uuid
+  primaryContactId String?             @map("primary_contact_id") @db.Uuid
+  lifecycleStatus  LeadLifecycleStatus @default(new) @map("lifecycle_status")
+  sourceCreatedAt  DateTime?           @map("source_created_at")
+  firstSeenAt      DateTime            @default(now()) @map("first_seen_at")
+  lastSeenAt       DateTime            @default(now()) @map("last_seen_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  client               Client                 @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business             ProspectBusiness?      @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  primaryContact       ProspectContact?       @relation("LeadPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  sourceRecords        LeadSourceRecord[]
+  signals              LeadSignal[]
+  scoreSnapshots       ScoreSnapshot[]
+  offerRecommendations OfferRecommendation[]
+  offerSuppressions    OfferSuppression[]
+  enrichmentRuns       EnrichmentRun[]
+  websiteAudits        WebsiteAudit[]
+  realEstateListings   RealEstateListing[]
+  outreachState        LeadOutreachState?
+  outreachActivities   OutreachActivity[]
+  realEstateAgent      RealEstateAgent?
+  contactPermission    LeadContactPermission?
+  deliveryRecords      DeliveryRecord[]
+  callQueueEntries     CallQueueEntry[]
+  callAttempts         CallAttempt[]
+
+  @@unique([clientId, businessId])
+  @@index([clientId, lifecycleStatus, updatedAt])
+  @@index([clientId, primaryContactId])
+  @@index([clientId, lastSeenAt])
+}
+
+model LeadContactPermission {
+  id                  String        @id @default(uuid()) @db.Uuid
+  leadId              String        @unique @map("lead_id") @db.Uuid
+  contactableProspect Boolean       @default(true) @map("contactable_prospect")
+  manualCallCandidate Boolean       @default(false) @map("manual_call_candidate")
+  smsConsent          ConsentStatus @default(unknown) @map("sms_consent")
+  smsEligible         Boolean       @default(false) @map("sms_eligible")
+  doNotContact        Boolean       @default(false) @map("do_not_contact")
+  suppressed          Boolean       @default(false)
+  consentSource       String?       @map("consent_source")
+  consentRecordedAt   DateTime?     @map("consent_recorded_at")
+  optedOutAt          DateTime?     @map("opted_out_at")
+  updatedBy           String?       @map("updated_by")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([contactableProspect, manualCallCandidate])
+  @@index([smsConsent, smsEligible])
+  @@index([doNotContact, suppressed])
+}
+
+model DeliveryCampaign {
+  id                String              @id @default(uuid()) @db.Uuid
+  clientId          String              @map("client_id") @db.Uuid
+  campaignKey       String              @map("campaign_key")
+  name              String
+  offer             IntelligenceOffer
+  destination       DeliveryDestination
+  criteria          Json
+  destinationConfig Json?               @map("destination_config")
+  payloadVersion    String              @map("payload_version")
+  enabled           Boolean             @default(true)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  deliveryRecords DeliveryRecord[]
+  CallQueueEntry  CallQueueEntry[]
+
+  @@unique([clientId, campaignKey])
+  @@index([clientId, offer, enabled])
+}
+
+model DeliveryRecord {
+  id             String              @id @default(uuid()) @db.Uuid
+  clientId       String              @map("client_id") @db.Uuid
+  leadId         String              @map("lead_id") @db.Uuid
+  campaignId     String              @map("campaign_id") @db.Uuid
+  destination    DeliveryDestination
+  status         DeliveryStatus      @default(pending)
+  externalId     String?             @map("external_id")
+  payloadVersion String              @map("payload_version")
+  payload        Json
+  error          String?
+  retryCount     Int                 @default(0) @map("retry_count")
+  deliveredAt    DateTime?           @map("delivered_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead           Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign       DeliveryCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  callQueueEntry CallQueueEntry?
+
+  @@unique([campaignId, leadId])
+  @@index([clientId, destination, status, createdAt])
+  @@index([campaignId, status])
+  @@index([leadId, deliveredAt])
+}
+
+model CallQueueEntry {
+  id               String             @id @default(uuid()) @db.Uuid
+  clientId         String             @map("client_id") @db.Uuid
+  leadId           String             @map("lead_id") @db.Uuid
+  campaignId       String             @map("campaign_id") @db.Uuid
+  deliveryRecordId String             @unique @map("delivery_record_id") @db.Uuid
+  status           ProspectCallStatus @default(not_called)
+  manualPriority   Int                @default(0) @map("manual_priority")
+  cooldownUntil    DateTime?          @map("cooldown_until")
+  nextFollowUpAt   DateTime?          @map("next_follow_up_at")
+  latestNote       String?            @map("latest_note")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead           Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign       DeliveryCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  deliveryRecord DeliveryRecord   @relation(fields: [deliveryRecordId], references: [id], onDelete: Cascade)
+  attempts       CallAttempt[]
+
+  @@unique([campaignId, leadId])
+  @@index([clientId, status, nextFollowUpAt])
+  @@index([clientId, cooldownUntil, manualPriority])
+}
+
+model CallAttempt {
+  id             String             @id @default(uuid()) @db.Uuid
+  clientId       String             @map("client_id") @db.Uuid
+  leadId         String             @map("lead_id") @db.Uuid
+  queueEntryId   String             @map("queue_entry_id") @db.Uuid
+  status         ProspectCallStatus
+  pitchAngle     String             @map("pitch_angle")
+  scoreAtAttempt Int?               @map("score_at_attempt")
+  scoreBand      String?            @map("score_band")
+  niche          String?
+  notes          String?
+  nextFollowUpAt DateTime?          @map("next_follow_up_at")
+  occurredAt     DateTime           @default(now()) @map("occurred_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  client     Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead       Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  queueEntry CallQueueEntry @relation(fields: [queueEntryId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, occurredAt])
+  @@index([clientId, status, occurredAt])
+  @@index([clientId, niche, occurredAt])
+  @@index([clientId, scoreBand, occurredAt])
+  @@index([clientId, pitchAngle, occurredAt])
+  @@index([leadId, occurredAt])
+}
+
+model IngestionRun {
+  id                String                @id @default(uuid()) @db.Uuid
+  clientId          String                @map("client_id") @db.Uuid
+  provider          String
+  idempotencyKey    String                @map("idempotency_key")
+  status            IntelligenceRunStatus @default(pending)
+  sourceReference   String?               @map("source_reference")
+  recordsReceived   Int                   @default(0) @map("records_received")
+  recordsValid      Int                   @default(0) @map("records_valid")
+  recordsInvalid    Int                   @default(0) @map("records_invalid")
+  recordsCreated    Int                   @default(0) @map("records_created")
+  recordsUpdated    Int                   @default(0) @map("records_updated")
+  recordsRejected   Int                   @default(0) @map("records_rejected")
+  newBusinesses     Int                   @default(0) @map("new_businesses")
+  updatedBusinesses Int                   @default(0) @map("updated_businesses")
+  newContacts       Int                   @default(0) @map("new_contacts")
+  updatedContacts   Int                   @default(0) @map("updated_contacts")
+  duplicates        Int                   @default(0)
+  recordsFailed     Int                   @default(0) @map("records_failed")
+  signalsCreated    Int                   @default(0) @map("signals_created")
+  signalsUpdated    Int                   @default(0) @map("signals_updated")
+  errorMessage      String?               @map("error_message")
+  metadata          Json?
+  startedAt         DateTime?             @map("started_at")
+  completedAt       DateTime?             @map("completed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  client               Client                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sourceRecords        LeadSourceRecord[]
+  sourceRecordVersions LeadSourceRecordVersion[]
+  errors               IngestionError[]
+  listingSourceRecords RealEstateListingSourceRecord[]
+
+  @@unique([clientId, provider, idempotencyKey])
+  @@index([clientId, status, createdAt])
+  @@index([provider, createdAt])
+}
+
+model LeadSourceRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  ingestionRunId  String?   @map("ingestion_run_id") @db.Uuid
+  leadId          String?   @map("lead_id") @db.Uuid
+  businessId      String?   @map("business_id") @db.Uuid
+  contactId       String?   @map("contact_id") @db.Uuid
+  provider        String
+  recordKey       String    @map("record_key")
+  externalId      String?   @map("external_id")
+  sourceUrl       String?   @map("source_url")
+  rawPayload      Json      @map("raw_payload")
+  payloadHash     String?   @map("payload_hash")
+  sourceCreatedAt DateTime? @map("source_created_at")
+  firstSeenAt     DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime  @default(now()) @map("last_seen_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  client             Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ingestionRun       IngestionRun?             @relation(fields: [ingestionRunId], references: [id], onDelete: SetNull)
+  lead               Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  business           ProspectBusiness?         @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  contact            ProspectContact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  signals            LeadSignal[]
+  enrichmentRuns     EnrichmentRun[]
+  websiteAudits      WebsiteAudit[]
+  realEstateListings RealEstateListing[]
+  versions           LeadSourceRecordVersion[]
+  ingestionErrors    IngestionError[]
+
+  @@unique([clientId, provider, recordKey])
+  @@index([clientId, provider, externalId])
+  @@index([clientId, leadId, lastSeenAt])
+  @@index([clientId, businessId])
+  @@index([clientId, contactId])
+  @@index([ingestionRunId])
+}
+
+model LeadSourceRecordVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  sourceRecordId String   @map("source_record_id") @db.Uuid
+  ingestionRunId String   @map("ingestion_run_id") @db.Uuid
+  payloadHash    String   @map("payload_hash")
+  rawPayload     Json     @map("raw_payload")
+  observedAt     DateTime @map("observed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sourceRecord LeadSourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
+  ingestionRun IngestionRun     @relation(fields: [ingestionRunId], references: [id], onDelete: Cascade)
+  signals      LeadSignal[]
+
+  @@unique([sourceRecordId, ingestionRunId, payloadHash])
+  @@index([sourceRecordId, observedAt])
+  @@index([ingestionRunId])
+}
+
+model IngestionError {
+  id             String   @id @default(uuid()) @db.Uuid
+  ingestionRunId String   @map("ingestion_run_id") @db.Uuid
+  sourceRecordId String?  @map("source_record_id") @db.Uuid
+  recordIndex    Int      @map("record_index")
+  stage          String
+  message        String
+  details        Json?
+  rawPayload     Json?    @map("raw_payload")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ingestionRun IngestionRun      @relation(fields: [ingestionRunId], references: [id], onDelete: Cascade)
+  sourceRecord LeadSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+
+  @@index([ingestionRunId, recordIndex])
+  @@index([sourceRecordId])
+}
+
+model LeadSignal {
+  id                    String    @id @default(uuid()) @db.Uuid
+  clientId              String    @map("client_id") @db.Uuid
+  leadId                String    @map("lead_id") @db.Uuid
+  sourceRecordId        String?   @map("source_record_id") @db.Uuid
+  sourceRecordVersionId String?   @map("source_record_version_id") @db.Uuid
+  key                   String
+  value                 Json
+  booleanValue          Boolean?  @map("boolean_value")
+  numberValue           Decimal?  @map("number_value") @db.Decimal(20, 6)
+  textValue             String?   @map("text_value")
+  dateValue             DateTime? @map("date_value")
+  provider              String
+  confidence            Decimal?  @db.Decimal(5, 4)
+  observedAt            DateTime  @map("observed_at")
+  expiresAt             DateTime? @map("expires_at")
+  evidence              Json?
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  client              Client                   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead                Lead                     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sourceRecord        LeadSourceRecord?        @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+  sourceRecordVersion LeadSourceRecordVersion? @relation(fields: [sourceRecordVersionId], references: [id], onDelete: SetNull)
+  scoreFactors        ScoreFactor[]
+
+  @@unique([leadId, key, sourceRecordVersionId])
+  @@index([clientId, leadId, key, observedAt])
+  @@index([clientId, key, booleanValue])
+  @@index([clientId, key, numberValue])
+  @@index([clientId, expiresAt])
+  @@index([sourceRecordId])
+  @@index([sourceRecordVersionId])
+}
+
+model ScoreSnapshot {
+  id             String            @id @default(uuid()) @db.Uuid
+  clientId       String            @map("client_id") @db.Uuid
+  leadId         String            @map("lead_id") @db.Uuid
+  offer          IntelligenceOffer
+  score          Int
+  rulesetVersion String            @map("ruleset_version")
+  inputAsOf      DateTime          @map("input_as_of")
+  explanation    Json?
+  calculatedAt   DateTime          @default(now()) @map("calculated_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  client          Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead            Lead                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  factors         ScoreFactor[]
+  recommendations OfferRecommendation[]
+
+  @@index([clientId, offer, score])
+  @@index([clientId, leadId, offer, calculatedAt])
+  @@index([rulesetVersion, calculatedAt])
+}
+
+model ScoreFactor {
+  id              String   @id @default(uuid()) @db.Uuid
+  scoreSnapshotId String   @map("score_snapshot_id") @db.Uuid
+  signalId        String?  @map("signal_id") @db.Uuid
+  key             String
+  label           String
+  points          Int
+  observedValue   Json?    @map("observed_value")
+  ruleVersion     String   @map("rule_version")
+  position        Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  scoreSnapshot ScoreSnapshot @relation(fields: [scoreSnapshotId], references: [id], onDelete: Cascade)
+  signal        LeadSignal?   @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  @@index([scoreSnapshotId, position])
+  @@index([signalId])
+}
+
+model OfferRecommendation {
+  id                    String            @id @default(uuid()) @db.Uuid
+  clientId              String            @map("client_id") @db.Uuid
+  leadId                String            @map("lead_id") @db.Uuid
+  scoreSnapshotId       String?           @map("score_snapshot_id") @db.Uuid
+  offer                 IntelligenceOffer
+  rank                  Int
+  recommended           Boolean           @default(true)
+  recommendationVersion String            @map("recommendation_version")
+  reason                Json
+  generatedAt           DateTime          @default(now()) @map("generated_at")
+  expiresAt             DateTime?         @map("expires_at")
+  createdAt             DateTime          @default(now()) @map("created_at")
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead          Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  scoreSnapshot ScoreSnapshot? @relation(fields: [scoreSnapshotId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, leadId, generatedAt])
+  @@index([clientId, offer, recommended, rank])
+  @@index([scoreSnapshotId])
+}
+
+model OfferSuppression {
+  id           String            @id @default(uuid()) @db.Uuid
+  clientId     String            @map("client_id") @db.Uuid
+  leadId       String            @map("lead_id") @db.Uuid
+  offer        IntelligenceOffer
+  reason       String
+  suppressedAt DateTime          @default(now()) @map("suppressed_at")
+  liftedAt     DateTime?         @map("lifted_at")
+  createdBy    String?           @map("created_by")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, offer, liftedAt])
+  @@index([leadId, offer, suppressedAt])
+}
+
+model EnrichmentRun {
+  id             String                @id @default(uuid()) @db.Uuid
+  clientId       String                @map("client_id") @db.Uuid
+  leadId         String                @map("lead_id") @db.Uuid
+  sourceRecordId String?               @map("source_record_id") @db.Uuid
+  provider       String
+  idempotencyKey String                @map("idempotency_key")
+  status         IntelligenceRunStatus @default(pending)
+  rawResponse    Json?                 @map("raw_response")
+  errorMessage   String?               @map("error_message")
+  startedAt      DateTime?             @map("started_at")
+  completedAt    DateTime?             @map("completed_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead         Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sourceRecord LeadSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+  websiteAudit WebsiteAudit?
+
+  @@unique([clientId, provider, idempotencyKey])
+  @@index([clientId, status, createdAt])
+  @@index([clientId, leadId, provider, createdAt])
+}
+
+model WebsiteAudit {
+  id               String    @id @default(uuid()) @db.Uuid
+  clientId         String    @map("client_id") @db.Uuid
+  leadId           String    @map("lead_id") @db.Uuid
+  businessId       String?   @map("business_id") @db.Uuid
+  sourceRecordId   String?   @map("source_record_id") @db.Uuid
+  enrichmentRunId  String?   @unique @map("enrichment_run_id") @db.Uuid
+  provider         String
+  auditedUrl       String    @map("audited_url")
+  normalizedDomain String    @map("normalized_domain")
+  statusCode       Int?      @map("status_code")
+  status           String
+  errorMessage     String?   @map("error_message")
+  finalUrl         String?   @map("final_url")
+  pagesCrawled     Int       @default(0) @map("pages_crawled")
+  durationMs       Int?      @map("duration_ms")
+  rawResult        Json      @map("raw_result")
+  observedAt       DateTime  @map("observed_at")
+  expiresAt        DateTime? @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  client        Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead          Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  business      ProspectBusiness? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  sourceRecord  LeadSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+  enrichmentRun EnrichmentRun?    @relation(fields: [enrichmentRunId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, leadId, observedAt])
+  @@index([clientId, normalizedDomain, observedAt])
+  @@index([sourceRecordId])
+}
+
+model RealEstateListing {
+  id                String    @id @default(uuid()) @db.Uuid
+  clientId          String    @map("client_id") @db.Uuid
+  leadId            String?   @map("lead_id") @db.Uuid
+  businessId        String?   @map("business_id") @db.Uuid
+  agentId           String?   @map("agent_id") @db.Uuid
+  sourceRecordId    String?   @map("source_record_id") @db.Uuid
+  provider          String
+  externalId        String    @map("external_id")
+  listingUrl        String?   @map("listing_url")
+  normalizedAddress String?   @map("normalized_address")
+  status            String?
+  address           String?
+  city              String?
+  state             String?
+  postalCode        String?   @map("postal_code")
+  latitude          Decimal?  @db.Decimal(10, 7)
+  longitude         Decimal?  @db.Decimal(10, 7)
+  price             Decimal?  @db.Decimal(14, 2)
+  bedrooms          Decimal?  @db.Decimal(5, 2)
+  bathrooms         Decimal?  @db.Decimal(5, 2)
+  squareFeet        Int?      @map("square_feet")
+  listingImages     String[]  @default([]) @map("listing_images")
+  brokerage         String?
+  listedAt          DateTime? @map("listed_at")
+  hasAgentHeadshot  Boolean?  @map("has_agent_headshot")
+  rawPayload        Json      @map("raw_payload")
+  firstSeenAt       DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  client          Client                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead            Lead?                           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  business        ProspectBusiness?               @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  agent           RealEstateAgent?                @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  sourceRecord    LeadSourceRecord?               @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+  providerSources RealEstateListingSourceRecord[]
+
+  @@unique([clientId, provider, externalId])
+  @@index([clientId, leadId, listedAt])
+  @@index([clientId, status, listedAt])
+  @@index([clientId, price])
+  @@index([clientId, normalizedAddress, postalCode])
+  @@index([clientId, agentId, status, listedAt])
+  @@index([sourceRecordId])
+}
+
+model RealEstateAgent {
+  id                   String   @id @default(uuid()) @db.Uuid
+  clientId             String   @map("client_id") @db.Uuid
+  leadId               String   @unique @map("lead_id") @db.Uuid
+  firstName            String?  @map("first_name")
+  lastName             String?  @map("last_name")
+  fullName             String
+  normalizedName       String   @map("normalized_name")
+  phone                String?
+  normalizedPhone      String?  @map("normalized_phone")
+  email                String?
+  normalizedEmail      String?  @map("normalized_email")
+  profileUrl           String?  @map("profile_url")
+  normalizedProfileUrl String?  @map("normalized_profile_url")
+  headshotUrl          String?  @map("headshot_url")
+  website              String?
+  instagramUrl         String?  @map("instagram_url")
+  facebookUrl          String?  @map("facebook_url")
+  tiktokUrl            String?  @map("tiktok_url")
+  brokerage            String?
+  licenseNumber        String?  @map("license_number")
+  firstSeenAt          DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt           DateTime @default(now()) @map("last_seen_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  client           Client                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead             Lead                            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  listings         RealEstateListing[]
+  sourceRecords    RealEstateListingSourceRecord[]
+  ProspectBusiness ProspectBusiness[]
+
+  @@index([clientId, normalizedEmail])
+  @@index([clientId, normalizedPhone])
+  @@index([clientId, normalizedProfileUrl])
+  @@index([clientId, normalizedName, brokerage])
+}
+
+model RealEstateListingSourceRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  clientId       String   @map("client_id") @db.Uuid
+  ingestionRunId String?  @map("ingestion_run_id") @db.Uuid
+  listingId      String   @map("listing_id") @db.Uuid
+  agentId        String?  @map("agent_id") @db.Uuid
+  provider       String
+  externalId     String   @map("external_id")
+  sourceUrl      String?  @map("source_url")
+  rawPayload     Json     @map("raw_payload")
+  payloadHash    String   @map("payload_hash")
+  firstSeenAt    DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  client       Client                           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ingestionRun IngestionRun?                    @relation(fields: [ingestionRunId], references: [id], onDelete: SetNull)
+  listing      RealEstateListing                @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  agent        RealEstateAgent?                 @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  versions     RealEstateListingSourceVersion[]
+
+  @@unique([clientId, provider, externalId])
+  @@index([clientId, listingId])
+  @@index([clientId, agentId])
+  @@index([ingestionRunId])
+}
+
+model RealEstateListingSourceVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  sourceRecordId String   @map("source_record_id") @db.Uuid
+  payloadHash    String   @map("payload_hash")
+  rawPayload     Json     @map("raw_payload")
+  observedAt     DateTime @map("observed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sourceRecord RealEstateListingSourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceRecordId, payloadHash])
+  @@index([sourceRecordId, observedAt])
+}
+
+model LeadOutreachState {
+  id                  String              @id @default(uuid()) @db.Uuid
+  leadId              String              @unique @map("lead_id") @db.Uuid
+  disposition         OutreachDisposition @default(not_contacted)
+  contactable         Boolean             @default(true)
+  doNotContactReason  String?             @map("do_not_contact_reason")
+  lastContactedAt     DateTime?           @map("last_contacted_at")
+  nextContactAt       DateTime?           @map("next_contact_at")
+  contactAttemptCount Int                 @default(0) @map("contact_attempt_count")
+  lastChannel         OutreachChannel?    @map("last_channel")
+  lastOutcome         String?             @map("last_outcome")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([disposition, nextContactAt])
+  @@index([contactable, nextContactAt])
+}
+
+model OutreachActivity {
+  id         String            @id @default(uuid()) @db.Uuid
+  clientId   String            @map("client_id") @db.Uuid
+  leadId     String            @map("lead_id") @db.Uuid
+  channel    OutreachChannel
+  direction  OutreachDirection
+  provider   String?
+  externalId String?           @map("external_id")
+  outcome    String?
+  occurredAt DateTime          @map("occurred_at")
+  metadata   Json?
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, provider, externalId])
+  @@index([clientId, leadId, occurredAt])
+  @@index([clientId, channel, occurredAt])
+}

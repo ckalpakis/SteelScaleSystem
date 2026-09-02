@@ -1,0 +1,52 @@
+[
+  [
+    {
+      "name": "Triangle Emergency Plumbing",
+      "type": "Plumber",
+      "category": "Plumber",
+      "subtypes": ["Plumber", "Emergency plumber", "Drainage service"],
+      "services": ["Emergency plumbing", "Drain cleaning", "Water heater repair"],
+      "phone": "+1 919-555-0142",
+      "website": "https://www.triangle-emergency.example/services",
+      "address": "401 Fayetteville St, Raleigh, NC 27601, United States",
+      "street": "401 Fayetteville St",
+      "city": "Raleigh",
+      "state": "North Carolina",
+      "state_code": "NC",
+      "postal_code": "27601",
+      "country": "United States",
+      "country_code": "US",
+      "latitude": 35.7749,
+      "longitude": -78.6382,
+      "rating": 4.8,
+      "reviews": 237,
+      "place_id": "ChIJphase3triangle",
+      "google_id": "0x89ac5:0xphase3triangle",
+      "cid": "9876543210123456789",
+      "business_status": "OPERATIONAL",
+      "working_hours": {
+        "Monday": "Open 24 hours",
+        "Tuesday": "Open 24 hours",
+        "Wednesday": "Open 24 hours",
+        "Thursday": "Open 24 hours",
+        "Friday": "Open 24 hours",
+        "Saturday": "Open 24 hours",
+        "Sunday": "Open 24 hours"
+      },
+      "reservation_links": ["https://book.triangle-emergency.example/service"],
+      "booking_appointment_link": "https://triangle-emergency.example/appointment",
+      "verified": true,
+      "owner_id": "owner-phase-3",
+      "owner_title": "Taylor - Triangle Emergency Plumbing",
+      "owner_link": "https://www.google.com/maps/contrib/owner-phase-3",
+      "location_link": "https://www.google.com/maps/place/?q=place_id:ChIJphase3triangle",
+      "photos_count": 86,
+      "description": "Local emergency plumbing and drain service.",
+      "about": {
+        "Service options": { "Online estimates": true },
+        "Planning": { "Appointment required": false }
+      },
+      "area_service": true
+    }
+  ]
+]
