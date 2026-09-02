@@ -55,7 +55,7 @@ async function simulate(): Promise<void> {
           {
             id: toolCallId,
             name: 'create_booking',
-            parameters: {
+            arguments: {
               customerName: 'Jamie Test',
               phoneNumber: '+15558675309',
               address: '123 Test Street, Raleigh, NC 27601',

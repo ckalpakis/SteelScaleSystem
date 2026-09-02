@@ -66,10 +66,17 @@ async function findClientForMessage(message: JsonObject) {
   return { ...client, voiceConfig: client.voiceAgentConfig };
 }
 
-function renderSystemPrompt(template: string, businessName: string, services: string[]): string {
-  return template
+function renderSystemPrompt(
+  template: string,
+  businessName: string,
+  services: string[],
+  timezone: string,
+): string {
+  const rendered = template
     .replaceAll('{business_name}', businessName)
     .replaceAll('{services}', services.join(', '));
+
+  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time.`;
 }
 
 export async function buildAssistantResponse(message: JsonObject): Promise<JsonObject> {
@@ -89,6 +96,7 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
               client.voiceConfig.systemPrompt,
               client.businessName,
               client.services,
+              client.timezone,
             ),
           },
         ],
@@ -107,7 +115,8 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
                   service: { type: 'string' },
                   preferredTime: {
                     type: 'string',
-                    description: 'ISO 8601 timestamp including timezone offset',
+                    description:
+                      'Future ISO 8601 timestamp including the business timezone offset',
                   },
                 },
                 required: ['customerName', 'phoneNumber', 'address', 'service', 'preferredTime'],
@@ -228,8 +237,9 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
 
   for (const value of toolCalls) {
     const toolCall = objectValue(value);
-    const id = stringValue(toolCall?.id);
-    const name = stringValue(toolCall?.name);
+    const functionCall = objectValue(toolCall?.function);
+    const id = stringValue(toolCall?.id) ?? stringValue(toolCall?.toolCallId);
+    const name = stringValue(toolCall?.name) ?? stringValue(functionCall?.name);
     if (!id || !name) continue;
 
     if (name !== 'create_booking') {
@@ -237,7 +247,30 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
       continue;
     }
 
-    const parameters = parseToolArguments(toolCall?.parameters);
+    // Vapi's current Function Tool webhook uses `arguments`. Keep the older
+    // `parameters` variants so calls created with legacy configurations still work.
+    const parameters = parseToolArguments(
+      toolCall?.arguments ??
+        toolCall?.parameters ??
+        functionCall?.arguments ??
+        functionCall?.parameters,
+    );
+    const preferredTime = stringValue(parameters?.preferredTime);
+    const preferredTimestamp = Date.parse(preferredTime ?? '');
+    if (
+      preferredTime &&
+      (!Number.isFinite(preferredTimestamp) || preferredTimestamp <= Date.now())
+    ) {
+      results.push({
+        name,
+        toolCallId: id,
+        result: JSON.stringify({
+          accepted: false,
+          error: 'The requested appointment time must be a valid future date and time.',
+        }),
+      });
+      continue;
+    }
     const booking = parameters ? bookingFromTool(parameters, context, id) : undefined;
 
     if (!booking) {
