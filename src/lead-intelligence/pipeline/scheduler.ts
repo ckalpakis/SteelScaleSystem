@@ -25,6 +25,10 @@ export function clearLeadDiscoveryProviders(): void {
   delete providers.real_estate;
 }
 
+export function configuredLeadDiscoveryProviders() {
+  return { ...providers };
+}
+
 export function parsePipelineCampaigns(value: string | undefined): PipelineCampaign[] {
   if (!value?.trim()) return [];
   const parsed = JSON.parse(value) as unknown;

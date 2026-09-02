@@ -28,6 +28,14 @@ export const env = {
   LLM_PROVIDER: parseLlmProvider(process.env.LLM_PROVIDER),
   LLM_MODEL: process.env.LLM_MODEL,
   LEAD_ANALYST_MODEL: process.env.LEAD_ANALYST_MODEL,
+  OUTSCRAPER_API_KEY: process.env.OUTSCRAPER_API_KEY,
+  OUTSCRAPER_API_BASE_URL: process.env.OUTSCRAPER_API_BASE_URL ?? 'https://api.outscraper.com',
+  APIFY_API_TOKEN: process.env.APIFY_API_TOKEN,
+  APIFY_API_BASE_URL: process.env.APIFY_API_BASE_URL ?? 'https://api.apify.com/v2',
+  APIFY_ZILLOW_SEARCH_ACTOR_ID:
+    process.env.APIFY_ZILLOW_SEARCH_ACTOR_ID ?? 'maxcopell/zillow-scraper',
+  APIFY_ZILLOW_DETAIL_ACTOR_ID:
+    process.env.APIFY_ZILLOW_DETAIL_ACTOR_ID ?? 'maxcopell/zillow-detail-scraper',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   GHL_API_KEY: process.env.GHL_API_KEY,

@@ -100,6 +100,34 @@ async function run(): Promise<void> {
   });
   assert(result.rankings[0]?.leadId === 'lead-top', 'AI cannot reorder deterministic ranking');
   assert(result.rankings[0]?.notes.length === 2, 'analyst notes parsed');
+
+  const { organizeLeadsByOffer } =
+    await import('../src/lead-intelligence/analyst/offer-organizer.js');
+  const organizerFetcher: typeof fetch = (_input, init) => {
+    assert(typeof init?.body === 'string', 'organizer request has JSON body');
+    const request = JSON.parse(init.body) as { input?: string };
+    const submitted = JSON.parse(request.input ?? '[]') as Array<{ leadId: string }>;
+    const organized = {
+      leads: submitted.map(({ leadId }, index) => ({
+        leadId,
+        recommendedOffer: index === 0 ? 'VOICE_AI' : 'WEBSITE',
+        confidence: 0.9,
+        reason: 'Supported by fixture evidence.',
+        salesNotes: ['Review the evidence', 'Use the matching offer'],
+      })),
+    };
+    return Promise.resolve(
+      new Response(JSON.stringify({ output_text: JSON.stringify(organized) }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  };
+  const organization = await organizeLeadsByOffer(rows, ['VOICE_AI', 'WEBSITE', 'SEO_RANKING'], {
+    fetcher: organizerFetcher,
+  });
+  assert(organization.leads.length === 2, 'every lead organized');
+  assert(organization.leads[0]?.recommendedOffer === 'VOICE_AI', 'offer parsed');
   process.stdout.write('Lead Intelligence AI analyst tests passed.\n');
 }
 

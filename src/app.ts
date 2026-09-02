@@ -10,6 +10,9 @@ import { internalBookingRouter } from './routes/internal-bookings.js';
 import { twilioWebhookRouter } from './routes/twilio-webhooks.js';
 import { vapiWebhookRouter } from './routes/vapi-webhooks.js';
 import { logger } from './utils/logger.js';
+import { registerConfiguredLeadDiscoveryProviders } from './lead-intelligence/providers/register.js';
+
+registerConfiguredLeadDiscoveryProviders();
 
 export const app = express();
 

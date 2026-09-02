@@ -37,7 +37,8 @@
     "test:lead-intelligence-phase-9": "tsx scripts/test-lead-intelligence-phase-9.ts",
     "test:lead-intelligence-phase-10": "tsx scripts/test-lead-intelligence-phase-10.ts",
     "test:lead-intelligence-phase-11": "tsx scripts/test-lead-intelligence-phase-11.ts",
-    "test:lead-intelligence-analyst": "tsx scripts/test-lead-intelligence-analyst.ts"
+    "test:lead-intelligence-analyst": "tsx scripts/test-lead-intelligence-analyst.ts",
+    "test:lead-discovery-providers": "tsx scripts/test-lead-discovery-providers.ts"
   },
   "engines": {
     "node": ">=20"

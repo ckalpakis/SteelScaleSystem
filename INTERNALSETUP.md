@@ -485,6 +485,12 @@ After importing, enriching, and scoring leads:
 
 The analyst uses the existing `OPENAI_API_KEY`. Optionally set `LEAD_ANALYST_MODEL`; otherwise it uses `LLM_MODEL`, followed by the application's default model. The AI writes fit summaries, sales angles, notes, and evidence warnings. It does not change numeric scores or primary offers, contact prospects, or grant permission to text.
 
+### Organize leads into three offer CSV files
+
+Open `/admin/leads/organize` or select **Organize into 3 offer CSVs** from the Lead Intelligence dashboard. Choose a client, optional minimum score, maximum list size, and exactly three offers. The defaults are Voice AI, Website, and SEO Ranking.
+
+The organizer analyzes up to 100 leads in batches, assigns every lead to exactly one selected offer, and returns three download buttons. Each CSV includes contact fields, the recommended offer, AI confidence, reasoning, sales notes, existing deterministic score, and source metrics. The files are generated in the browser for download and are not sent to an outreach platform.
+
 ## 17. Website Intelligence enrichment
 
 Audit websites for a client:
@@ -568,17 +574,20 @@ Pipeline campaigns are read from `LEAD_PIPELINE_CAMPAIGNS_JSON`. Example configu
 ]
 ```
 
-### Required provider registration
+### Provider API configuration
 
-`LEAD_PIPELINE_CAMPAIGNS_JSON` defines **what** to search. It does not contain or instantiate an Outscraper or Apify HTTP client. The application currently uses a provider-neutral discovery registry so canonical ingestion remains decoupled from vendors.
+The application automatically registers a provider when its server-side credential exists:
 
-Before enabling the scheduled route, a programmatic provider implementation must be registered during application startup with `registerLeadDiscoveryProvider()` from:
-
-```text
-src/lead-intelligence/pipeline/scheduler.ts
+```env
+OUTSCRAPER_API_KEY=...
+APIFY_API_TOKEN=...
+APIFY_ZILLOW_SEARCH_ACTOR_ID=maxcopell/zillow-scraper
+APIFY_ZILLOW_DETAIL_ACTOR_ID=maxcopell/zillow-detail-scraper
 ```
 
-Register `outscraper_google_maps`, `real_estate`, or both. The provider receives the campaign's discovery configuration and returns records plus an optional source reference. Until that startup wiring exists, leave `LEAD_PIPELINE_CAMPAIGNS_JSON=[]` and use file import; otherwise the pipeline will record a provider failure and alert Slack.
+Add the credentials to the Railway application service, not to browser code or a public repository. Open `/admin/leads/search` for a manual provider run. Start with 10–25 results; a run consumes provider credits and also performs bounded website enrichment. Outscraper accepts keyword and location lists. Apify requires complete Zillow search URLs configured for newest-first listings and runs Search followed by Detail automatically.
+
+`LEAD_PIPELINE_CAMPAIGNS_JSON` defines scheduled searches. Leave it empty until one small dashboard run completes successfully.
 
 The pipeline stages are:
 
@@ -731,7 +740,7 @@ CRON_SECRET=...
 LEAD_PIPELINE_CAMPAIGNS_JSON=[]
 ```
 
-Leave the pipeline array empty until programmatic discovery providers are registered and tested.
+Leave the pipeline array empty until both provider credentials and a small manual dashboard run are verified.
 
 Railway injects `PORT`; do not set it manually.
 
@@ -774,7 +783,7 @@ curl --fail --request POST \
 
 `X-Cron-Secret` is also accepted when a scheduler cannot set an Authorization header. Never place `CRON_SECRET` in a query string.
 
-Do not schedule the lead route until discovery providers are registered, campaign JSON is valid, and one manual invocation succeeds.
+Do not schedule the lead route until provider credentials work, campaign JSON is valid, and one manual invocation succeeds.
 
 ## 24. Production smoke test
 
@@ -900,7 +909,7 @@ Confirm the supplied Bearer token exactly matches `CRON_SECRET`. Do not include 
 
 ### Lead pipeline reports no registered provider
 
-Campaign JSON does not create provider clients. Register the relevant discovery provider in application startup or disable the campaign and use manual file import.
+Add `OUTSCRAPER_API_KEY` or `APIFY_API_TOKEN` to the Railway application service and redeploy. Confirm `/admin/leads/search` no longer labels that provider as unconfigured.
 
 ### Website enrichment has many failures
 
@@ -960,7 +969,7 @@ Use this order for a new environment:
 11. Verify deterministic scores and recommendations.
 12. Test CSV qualified-lead delivery.
 13. Test a non-production call queue and call outcome.
-14. Register and test automated discovery providers.
+14. Add provider API credentials and test one dashboard search.
 15. Enable one small scheduled campaign.
 16. Gradually raise result and concurrency limits after reviewing error rates.
 

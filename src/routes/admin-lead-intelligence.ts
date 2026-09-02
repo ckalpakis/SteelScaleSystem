@@ -3,6 +3,10 @@ import { IntelligenceOffer } from '@prisma/client';
 
 import { db } from '../db/client.js';
 import { analyzeLeadList } from '../lead-intelligence/analyst/service.js';
+import {
+  DEFAULT_ORGANIZER_OFFERS,
+  organizeLeadsByOffer,
+} from '../lead-intelligence/analyst/offer-organizer.js';
 import { auditBusinessWebsite } from '../lead-intelligence/enrichment/website-audit.js';
 import {
   loadLeadIntelligenceDashboard,
@@ -14,9 +18,11 @@ import {
 import { scoreLead } from '../lead-intelligence/scoring/service.js';
 import { adminLayout, escapeHtml } from '../utils/html.js';
 import { adminOutscraperImportRouter } from './admin-outscraper-import.js';
+import { adminLeadSearchRouter } from './admin-lead-search.js';
 
 export const adminLeadIntelligenceRouter = Router();
 adminLeadIntelligenceRouter.use('/import', adminOutscraperImportRouter);
+adminLeadIntelligenceRouter.use('/search', adminLeadSearchRouter);
 
 function value(input: unknown): string | undefined {
   return typeof input === 'string' && input.trim() ? input.trim() : undefined;
@@ -179,6 +185,33 @@ function preservedQuery(request: Request): string {
   return query.toString();
 }
 
+function bodyStrings(request: Request, key: string): string[] {
+  const raw = (request.body as Record<string, unknown> | undefined)?.[key];
+  return (Array.isArray(raw) ? raw : [raw]).filter(
+    (item): item is string => typeof item === 'string',
+  );
+}
+
+function csvCell(value: string | number | null | undefined): string {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`;
+}
+
+function offerOrganizerForm(
+  clients: Array<{ id: string; businessName: string }>,
+  selectedOffers = DEFAULT_ORGANIZER_OFFERS,
+): string {
+  return `<form method="post" action="/admin/leads/organize" class="stack"><section class="panel"><div class="section-heading"><span>01</span><div><h2>Choose the lead list</h2><p>Analyze up to 100 leads and create three downloadable CSV files.</p></div></div><div class="form-grid"><label>Client<select name="clientId"><option value="">All clients</option>${clients.map((client) => `<option value="${client.id}">${escapeHtml(client.businessName)}</option>`).join('')}</select></label><label>Minimum existing score<input name="minimumScore" type="number" min="0" max="100" value="0"></label><label>Maximum leads<input name="maximumLeads" type="number" min="1" max="100" value="100"></label></div></section><section class="panel"><div class="section-heading"><span>02</span><div><h2>Select exactly three offers</h2><p>ChatGPT assigns every matching lead to one of these offers using stored evidence.</p></div></div><div class="offer-picker">${Object.values(
+    IntelligenceOffer,
+  )
+    .map(
+      (offer) =>
+        `<label><input type="checkbox" name="offers" value="${offer}"${selectedOffers.includes(offer) ? ' checked' : ''}> ${escapeHtml(offer.replaceAll('_', ' '))}</label>`,
+    )
+    .join(
+      '',
+    )}</div></section><div class="form-actions"><button type="submit">Organize leads and prepare CSVs</button></div></form>`;
+}
+
 adminLeadIntelligenceRouter.get('/', async (request, response, next) => {
   try {
     const filters = filtersFrom(request);
@@ -194,7 +227,7 @@ adminLeadIntelligenceRouter.get('/', async (request, response, next) => {
       adminLayout(
         'Lead Intelligence',
         `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav>
-      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><div class="header-actions"><a class="button" href="/admin/leads/import">Import Outscraper file</a><form method="post" action="/admin/leads/analyze?${escapeHtml(currentQuery)}"><button type="submit">Analyze top leads with AI</button></form><a class="button secondary" href="/admin/leads/export.csv?${escapeHtml(currentQuery)}">Export current view</a></div></header>
+      <header class="page-header intelligence-header"><div><h1>Prospecting command board</h1><p>Rank opportunities, inspect evidence, and control outreach readiness.</p></div><div class="header-actions"><a class="button" href="/admin/leads/search">Run provider search</a><a class="button secondary" href="/admin/leads/import">Import file</a><a class="button" href="/admin/leads/organize">Organize into 3 offer CSVs</a><form method="post" action="/admin/leads/analyze?${escapeHtml(currentQuery)}"><button type="submit">Analyze top leads with AI</button></form><a class="button secondary" href="/admin/leads/export.csv?${escapeHtml(currentQuery)}">Export current view</a></div></header>
       ${renderMetrics(metrics)}${renderFilters(request, clients)}
       <section class="panel table-panel intelligence-table"><div class="table-caption"><strong>${rows.length} prospects</strong><span>Current scores and latest evidence</span></div>${renderRows(rows)}</section>`,
       ),
@@ -224,6 +257,116 @@ adminLeadIntelligenceRouter.post('/analyze', async (request, response, next) => 
       adminLayout(
         'AI Lead Analysis',
         `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads?${escapeHtml(preservedQuery(request))}">← Prospecting dashboard</a><h1>AI lead analysis</h1><p>${report.analyzedCount} scored prospects reviewed · ${report.rankings.length} recommendations · ${escapeHtml(report.model)}</p></div><span class="badge neutral">Generated ${escapeHtml(report.generatedAt.toLocaleString())}</span></header><div class="notice">Numeric scores and primary offers remain deterministic. AI generated the sales interpretation and notes from stored evidence.</div><section class="analyst-results">${cards}</section>`,
+      ),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminLeadIntelligenceRouter.get('/organize', async (_request, response, next) => {
+  try {
+    const clients = await db.client.findMany({
+      select: { id: true, businessName: true },
+      orderBy: { businessName: 'asc' },
+    });
+    response.send(
+      adminLayout(
+        'Organize Leads by Offer',
+        `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads">← Lead Intelligence</a><h1>Organize leads by offer</h1><p>Create three separate, AI-organized CSV files for your own outreach workflow.</p></div></header>${offerOrganizerForm(clients)}`,
+      ),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminLeadIntelligenceRouter.post('/organize', async (request, response, next) => {
+  try {
+    const selectedOffers = bodyStrings(request, 'offers').filter((offer) =>
+      Object.values(IntelligenceOffer).includes(offer as IntelligenceOffer),
+    ) as IntelligenceOffer[];
+    const minimumScore = Number(bodyStrings(request, 'minimumScore')[0] ?? '0');
+    const maximumLeads = Number(bodyStrings(request, 'maximumLeads')[0] ?? '100');
+    const clientId = bodyStrings(request, 'clientId')[0] || undefined;
+    const { rows } = await loadLeadIntelligenceDashboard({
+      clientId,
+      minimumScore: Number.isFinite(minimumScore) ? minimumScore : 0,
+      sort: 'score',
+    });
+    const report = await organizeLeadsByOffer(rows, selectedOffers, { maximumLeads });
+    const rowsById = new Map(rows.map((row) => [row.leadId, row]));
+    const grouped = new Map(report.offers.map((offer) => [offer, [] as typeof report.leads]));
+    for (const lead of report.leads) grouped.get(lead.recommendedOffer)?.push(lead);
+    const downloads = report.offers.map((offer) => {
+      const header = [
+        'Name',
+        'Location',
+        'Niche',
+        'Recommended Offer',
+        'AI Confidence',
+        'AI Reason',
+        'Sales Notes',
+        'Existing Score',
+        'Score Band',
+        'Phone',
+        'Website',
+        'Reviews',
+        'Rating',
+        'Active Listings',
+        'Sources',
+      ];
+      const lines = (grouped.get(offer) ?? []).flatMap((lead) => {
+        const row = rowsById.get(lead.leadId);
+        return row
+          ? [
+              [
+                row.name,
+                row.location,
+                row.niche,
+                offer,
+                lead.confidence.toFixed(2),
+                lead.reason,
+                lead.salesNotes.join(' | '),
+                row.score,
+                row.scoreBand,
+                row.phone,
+                row.website,
+                row.reviewCount,
+                row.rating,
+                row.activeListings,
+                row.sources.join('|'),
+              ],
+            ]
+          : [];
+      });
+      return {
+        offer,
+        count: lines.length,
+        filename: `${offer.toLocaleLowerCase('en-US').replaceAll('_', '-')}-leads.csv`,
+        csv: [header, ...lines].map((line) => line.map(csvCell).join(',')).join('\n'),
+      };
+    });
+    const cards = downloads
+      .map(
+        (download, index) =>
+          `<article class="panel export-card"><div><span class="offer-tag">${escapeHtml(download.offer.replaceAll('_', ' '))}</span><strong>${download.count}</strong><small>leads</small></div><button type="button" data-download="${index}"${download.count ? '' : ' disabled'}>Download CSV</button></article>`,
+      )
+      .join('');
+    const preview = report.leads
+      .slice(0, 15)
+      .map((lead) => {
+        const row = rowsById.get(lead.leadId);
+        return row
+          ? `<tr><td><a href="/admin/leads/${row.leadId}">${escapeHtml(row.name)}</a></td><td>${escapeHtml(lead.recommendedOffer.replaceAll('_', ' '))}</td><td>${Math.round(lead.confidence * 100)}%</td><td>${escapeHtml(lead.reason)}</td></tr>`
+          : '';
+      })
+      .join('');
+    const downloadJson = JSON.stringify(downloads).replaceAll('<', '\\u003c');
+    response.send(
+      adminLayout(
+        'Organized Lead Exports',
+        `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads/organize">← New organization</a><h1>Three offer lists are ready</h1><p>${report.analyzedCount} leads analyzed · ${escapeHtml(report.model)} · ${escapeHtml(report.generatedAt.toLocaleString())}</p></div></header><section class="export-grid">${cards}</section><section class="panel table-panel"><div class="table-caption"><strong>Recommendation preview</strong><span>Open a lead to verify its underlying evidence</span></div><div class="table-wrap"><table><thead><tr><th>Lead</th><th>Offer</th><th>Confidence</th><th>Reason</th></tr></thead><tbody>${preview}</tbody></table></div></section><script>const files=${downloadJson};document.querySelectorAll('[data-download]').forEach(function(button){button.addEventListener('click',function(){const file=files[Number(button.getAttribute('data-download'))];const url=URL.createObjectURL(new Blob([file.csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=file.filename;link.click();setTimeout(function(){URL.revokeObjectURL(url)},1000);});});</script>`,
       ),
     );
   } catch (error) {
