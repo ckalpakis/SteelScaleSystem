@@ -21,8 +21,9 @@ export class OutscraperDiscoveryProvider implements DiscoveryProvider {
       rawConfig.locations.map((location) => `${keyword}, ${location}`),
     );
     const url = new URL('/maps/search', env.OUTSCRAPER_API_BASE_URL);
-    url.searchParams.set('query', JSON.stringify(queries));
-    url.searchParams.set('limit', String(Math.min(500, rawConfig.maximumResults)));
+    for (const query of queries) url.searchParams.append('query', query);
+    const resultsPerQuery = Math.max(1, Math.ceil(rawConfig.maximumResults / queries.length));
+    url.searchParams.set('limit', String(Math.min(500, resultsPerQuery)));
     url.searchParams.set('dropDuplicates', 'true');
     url.searchParams.set('language', 'en');
     url.searchParams.set('region', 'US');
@@ -34,7 +35,10 @@ export class OutscraperDiscoveryProvider implements DiscoveryProvider {
     );
     const initial = objectValue(body);
     const requestId = typeof initial?.id === 'string' ? initial.id : undefined;
-    let status = String(initial?.status ?? '').toLocaleLowerCase('en-US');
+    const initialStatus = initial?.status;
+    let status = (typeof initialStatus === 'string' ? initialStatus : '').toLocaleLowerCase(
+      'en-US',
+    );
     for (
       let poll = 0;
       requestId &&

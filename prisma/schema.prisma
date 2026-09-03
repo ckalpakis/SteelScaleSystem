@@ -402,8 +402,6 @@ model ProspectBusiness {
   sourceRecords      LeadSourceRecord[]
   websiteAudits      WebsiteAudit[]
   realEstateListings RealEstateListing[]
-  RealEstateAgent    RealEstateAgent?    @relation(fields: [realEstateAgentId], references: [id])
-  realEstateAgentId  String?             @db.Uuid
 
   @@unique([clientId, googlePlaceId])
   @@unique([clientId, googleCid])
@@ -976,11 +974,10 @@ model RealEstateAgent {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
-  client           Client                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  lead             Lead                            @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  listings         RealEstateListing[]
-  sourceRecords    RealEstateListingSourceRecord[]
-  ProspectBusiness ProspectBusiness[]
+  client        Client                          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead          Lead                            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  listings      RealEstateListing[]
+  sourceRecords RealEstateListingSourceRecord[]
 
   @@index([clientId, normalizedEmail])
   @@index([clientId, normalizedPhone])

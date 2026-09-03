@@ -11,7 +11,16 @@ export async function providerJson(
 ): Promise<unknown> {
   const response = await fetcher(url, { ...init, signal: AbortSignal.timeout(120_000) });
   const body: unknown = await response.json();
-  if (!response.ok) throw new Error(`Provider request failed (${response.status})`);
+  if (!response.ok) {
+    const object = objectValue(body);
+    const detail =
+      typeof object?.errorMessage === 'string'
+        ? object.errorMessage
+        : typeof object?.message === 'string'
+          ? object.message
+          : undefined;
+    throw new Error(`Provider request failed (${response.status})${detail ? `: ${detail}` : ''}`);
+  }
   return body;
 }
 

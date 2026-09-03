@@ -15,7 +15,17 @@ async function run(): Promise<void> {
   const requestUrl = (input: RequestInfo | URL) =>
     typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const outscraperFetch: typeof fetch = (input) => {
-    assert(requestUrl(input).includes('/maps/search'), 'Outscraper search endpoint used');
+    const url = new URL(requestUrl(input));
+    assert(url.pathname === '/maps/search', 'Outscraper search endpoint used');
+    assert(
+      url.searchParams.getAll('query')[0] === 'plumber, Pittsburgh PA',
+      'Outscraper query uses repeated query parameters',
+    );
+    assert(
+      url.searchParams.getAll('query').length === 2,
+      'Outscraper sends every query separately',
+    );
+    assert(url.searchParams.get('limit') === '5', 'Outscraper limit is distributed per query');
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -33,7 +43,7 @@ async function run(): Promise<void> {
     outscraperFetch,
   ).discover({
     kind: 'outscraper_google_maps',
-    keywords: ['plumber'],
+    keywords: ['plumber', 'hvac'],
     locations: ['Pittsburgh PA'],
     maximumResults: 10,
     minimumReviews: 10,
