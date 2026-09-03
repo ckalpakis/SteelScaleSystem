@@ -14,10 +14,12 @@ async function postJson(url: string, body: unknown): Promise<Record<string, unkn
 
 async function simulate(): Promise<void> {
   process.env.BOOKING_DELIVERY_DRY_RUN = 'true';
+  process.env.TWILIO_SMS_DRY_RUN = 'true';
   const { app } = await import('../src/app.js');
   const { db } = await import('../src/db/client.js');
   const { logger } = await import('../src/utils/logger.js');
   const callId = `vapi-call-test-${Date.now()}`;
+  const failedTransferCallId = `vapi-transfer-test-${Date.now()}`;
   const toolCallId = `vapi-tool-test-${Date.now()}`;
   const server = app.listen(0, '127.0.0.1');
 
@@ -84,8 +86,34 @@ async function simulate(): Promise<void> {
       where: { providerRequestId: toolCallId },
     });
     const callLog = await db.callLog.findUnique({ where: { providerCallId: callId } });
-    if (!bookingAttempt || !callLog)
-      throw new Error('Expected booking and call records were not created');
+    const ownerNotification = bookingAttempt
+      ? await db.ownerNotification.findUnique({
+          where: {
+            clientId_notificationType_eventKey: {
+              clientId: bookingAttempt.clientId,
+              notificationType: 'booking_success',
+              eventKey: bookingAttempt.id,
+            },
+          },
+        })
+      : null;
+    if (!bookingAttempt || !callLog || ownerNotification?.status !== 'sent') {
+      throw new Error('Expected booking, call, and owner notification records were not created');
+    }
+
+    await postJson(webhookUrl, {
+      message: {
+        type: 'end-of-call-report',
+        endedReason: 'call.in-progress.error-transfer-failed',
+        call: { ...call, id: failedTransferCallId },
+      },
+    });
+    const transferNotification = await db.ownerNotification.findFirst({
+      where: { notificationType: 'transfer_failure', eventKey: failedTransferCallId },
+    });
+    if (transferNotification?.status !== 'sent') {
+      throw new Error('Failed transfer did not notify the owner');
+    }
 
     logger.info(
       { assistantResponse, toolResponse, bookingAttempt, callLog },

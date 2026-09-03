@@ -38,7 +38,7 @@ cronRouter.use((request, response, next) => {
 cronRouter.post('/daily-summary', async (_request, response) => {
   try {
     const summary = await createDailySummary();
-    response.status(summary.slackSent ? 200 : 502).json(summary);
+    response.status(summary.slackSent || summary.ownerSmsAttempted > 0 ? 200 : 502).json(summary);
   } catch (error: unknown) {
     logger.error({ err: error, attempted: 'daily_summary' }, 'Daily summary job failed');
     response.status(500).json({ error: 'Daily summary job failed' });

@@ -2,6 +2,7 @@ import { BookingStatus, CallType } from '@prisma/client';
 
 import { db } from '../db/client.js';
 import { sendSlackMessage } from './slack-alerts.js';
+import { sendOwnerNotification } from './owner-notifications.js';
 
 export interface DailySummary {
   periodStart: string;
@@ -18,6 +19,8 @@ export interface DailySummary {
     createdAt: string;
   }>;
   slackSent: boolean;
+  ownerSmsAttempted: number;
+  ownerSmsSent: number;
 }
 
 export async function createDailySummary(now = new Date()): Promise<DailySummary> {
@@ -69,6 +72,56 @@ export async function createDailySummary(now = new Date()): Promise<DailySummary
     { attempted: 'daily_summary' },
   );
 
+  const notificationClients = await db.client.findMany({
+    where: { ownerNotificationNumber: { not: null }, dailySummarySms: true },
+    select: {
+      id: true,
+      businessName: true,
+      phoneNumber: true,
+      ownerNotificationNumber: true,
+    },
+  });
+  let ownerSmsSent = 0;
+  const eventKey = now.toISOString().slice(0, 10);
+  for (const client of notificationClients) {
+    if (!client.ownerNotificationNumber) continue;
+    const [clientCalls, clientMissed, clientBookings, clientFailures] = await Promise.all([
+      db.callLog.count({
+        where: { clientId: client.id, createdAt: { gte: since, lte: now } },
+      }),
+      db.callLog.count({
+        where: {
+          clientId: client.id,
+          createdAt: { gte: since, lte: now },
+          callType: CallType.missed,
+        },
+      }),
+      db.bookingAttempt.count({
+        where: {
+          clientId: client.id,
+          createdAt: { gte: since, lte: now },
+          status: BookingStatus.success,
+        },
+      }),
+      db.bookingAttempt.count({
+        where: {
+          clientId: client.id,
+          createdAt: { gte: since, lte: now },
+          status: BookingStatus.failed,
+        },
+      }),
+    ]);
+    const sent = await sendOwnerNotification({
+      clientId: client.id,
+      from: client.phoneNumber,
+      to: client.ownerNotificationNumber,
+      type: 'daily_summary',
+      eventKey,
+      body: `DAILY SUMMARY — ${client.businessName}\nCalls: ${clientCalls} · Missed: ${clientMissed}\nBookings: ${clientBookings} · Failed: ${clientFailures}`,
+    });
+    if (sent) ownerSmsSent += 1;
+  }
+
   return {
     periodStart: since.toISOString(),
     periodEnd: now.toISOString(),
@@ -77,5 +130,7 @@ export async function createDailySummary(now = new Date()): Promise<DailySummary
     bookings,
     failedBookingAttempts: failures,
     slackSent,
+    ownerSmsAttempted: notificationClients.length,
+    ownerSmsSent,
   };
 }

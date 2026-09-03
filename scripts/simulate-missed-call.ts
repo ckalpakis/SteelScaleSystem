@@ -34,8 +34,20 @@ async function simulate(): Promise<void> {
     }
 
     const callLog = await db.callLog.findUnique({ where: { providerCallId: callSid } });
-
     if (!callLog) throw new Error('Webhook returned successfully but no CallLog was created');
+    const ownerNotification = await db.ownerNotification.findUnique({
+      where: {
+        clientId_notificationType_eventKey: {
+          clientId: callLog.clientId,
+          notificationType: 'missed_call',
+          eventKey: callSid,
+        },
+      },
+    });
+
+    if (ownerNotification?.status !== 'sent') {
+      throw new Error('Webhook did not create the call log and owner notification');
+    }
 
     logger.info({ callLog }, 'Missed-call simulation succeeded');
   } finally {

@@ -88,6 +88,7 @@ This project uses Vapi, not Retell.
 8. Open **Phone Numbers**, select the production Vapi number, and confirm it uses this assistant. If using dynamic assistant selection, set the phone number's server URL to the same endpoint instead of assigning a fixed assistant.
 9. Copy the Vapi assistant ID and phone-number ID into that client's `VoiceAgentConfig` through `APP_URL/admin`.
 10. To enable owner escalation, enter a separate E.164 **Owner transfer number** in the client admin form and choose blind or warm-summary transfer. The dynamic assistant response adds Vapi's transfer tool automatically; no separate Vapi Dashboard tool is required.
+11. Enter the **Owner notification number** and enable the desired SMS alerts. The client's main Twilio number must be SMS-capable and registered for the applicable messaging requirements.
 
 Make a test call and confirm that a `CallLog` appears in the client's admin detail page.
 
@@ -115,7 +116,7 @@ POST APP_URL/internal/cron/daily-summary
 Authorization: Bearer <CRON_SECRET>
 ```
 
-The endpoint posts the report to `SLACK_WEBHOOK_URL`. A failed booking also posts an immediate alert through the same Slack webhook.
+The endpoint posts the cross-client report to `SLACK_WEBHOOK_URL` and sends each opted-in owner a separate summary containing only that client's activity. A failed booking also posts an immediate Slack alert and, when enabled, an owner SMS.
 
 ## Environment variables
 

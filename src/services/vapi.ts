@@ -7,6 +7,7 @@ import { logger } from '../utils/logger.js';
 import { createBookingAttempt } from './bookings.js';
 import { getGhlCalendarAvailability } from './ghl.js';
 import { checkAvailabilityThroughZapier } from './zapier-availability.js';
+import { sendOwnerNotification } from './owner-notifications.js';
 import type { CalendarAvailabilityResult } from '../types/availability.js';
 
 type JsonObject = Record<string, unknown>;
@@ -253,6 +254,7 @@ function durationSeconds(message: JsonObject): number {
 export async function logCallEnded(message: JsonObject): Promise<void> {
   const context = await contextForMessage(message);
   if (!context) throw new Error('Unable to resolve Vapi call-end context');
+  const call = objectValue(message.call);
   const booking = await db.bookingAttempt.findFirst({
     where: { providerCallId: context.callId, status: 'success' },
   });
@@ -274,6 +276,41 @@ export async function logCallEnded(message: JsonObject): Promise<void> {
       rawPayload: message as Prisma.InputJsonValue,
     },
   });
+
+  const endedReason = stringValue(message.endedReason) ?? stringValue(call?.endedReason);
+  const transferFailed =
+    endedReason?.toLocaleLowerCase('en-US').includes('transfer') === true &&
+    (endedReason.toLocaleLowerCase('en-US').includes('fail') ||
+      endedReason.toLocaleLowerCase('en-US').includes('error'));
+  if (
+    transferFailed &&
+    context.client.ownerNotificationNumber &&
+    context.client.notifyTransferFailureSms
+  ) {
+    await sendOwnerNotification({
+      clientId: context.client.id,
+      from: context.client.phoneNumber,
+      to: context.client.ownerNotificationNumber,
+      type: 'transfer_failure',
+      eventKey: context.callId,
+      body: `MISSED TRANSFER — ${context.client.businessName}\nCaller: ${context.callerNumber}\nThe owner transfer failed. Please call them back.`,
+    });
+  }
+  if (
+    !booking &&
+    !transferFailed &&
+    context.client.ownerNotificationNumber &&
+    context.client.notifyUnbookedCallSms
+  ) {
+    await sendOwnerNotification({
+      clientId: context.client.id,
+      from: context.client.phoneNumber,
+      to: context.client.ownerNotificationNumber,
+      type: 'unbooked_call',
+      eventKey: context.callId,
+      body: `NEW CALL — ${context.client.businessName}\nCaller: ${context.callerNumber}\nThe AI handled the call, but no appointment was booked.`,
+    });
+  }
 }
 
 function parseToolArguments(value: unknown): JsonObject | undefined {

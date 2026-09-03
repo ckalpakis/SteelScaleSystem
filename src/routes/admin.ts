@@ -19,6 +19,13 @@ type ClientForm = {
   timezone: string;
   services: string;
   missedCallSmsTemplate: string;
+  ownerNotificationNumber: string;
+  notifyBookingSms: boolean;
+  notifyMissedCallSms: boolean;
+  notifyUnbookedCallSms: boolean;
+  notifyFailedBookingSms: boolean;
+  notifyTransferFailureSms: boolean;
+  dailySummarySms: boolean;
   destinationType: 'zapier' | 'ghl_fallback';
   zapierWebhookUrl: string;
   zapierAvailabilityWebhookUrl: string;
@@ -38,6 +45,13 @@ const defaultForm: ClientForm = {
   services: '',
   missedCallSmsTemplate:
     "Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.",
+  ownerNotificationNumber: '',
+  notifyBookingSms: true,
+  notifyMissedCallSms: true,
+  notifyUnbookedCallSms: true,
+  notifyFailedBookingSms: true,
+  notifyTransferFailureSms: true,
+  dailySummarySms: true,
   destinationType: 'zapier',
   zapierWebhookUrl: '',
   zapierAvailabilityWebhookUrl: '',
@@ -56,6 +70,11 @@ function bodyValue(body: Request['body'], key: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function bodyChecked(body: Request['body'], key: string): boolean {
+  const values = body as Record<string, unknown> | undefined;
+  return values?.[key] === 'on';
+}
+
 function parseForm(request: Request): ClientForm {
   return {
     businessName: bodyValue(request.body, 'businessName'),
@@ -63,6 +82,13 @@ function parseForm(request: Request): ClientForm {
     timezone: bodyValue(request.body, 'timezone'),
     services: bodyValue(request.body, 'services'),
     missedCallSmsTemplate: bodyValue(request.body, 'missedCallSmsTemplate'),
+    ownerNotificationNumber: bodyValue(request.body, 'ownerNotificationNumber'),
+    notifyBookingSms: bodyChecked(request.body, 'notifyBookingSms'),
+    notifyMissedCallSms: bodyChecked(request.body, 'notifyMissedCallSms'),
+    notifyUnbookedCallSms: bodyChecked(request.body, 'notifyUnbookedCallSms'),
+    notifyFailedBookingSms: bodyChecked(request.body, 'notifyFailedBookingSms'),
+    notifyTransferFailureSms: bodyChecked(request.body, 'notifyTransferFailureSms'),
+    dailySummarySms: bodyChecked(request.body, 'dailySummarySms'),
     destinationType:
       bodyValue(request.body, 'destinationType') === 'ghl_fallback' ? 'ghl_fallback' : 'zapier',
     zapierWebhookUrl: bodyValue(request.body, 'zapierWebhookUrl'),
@@ -116,6 +142,10 @@ function validateForm(form: ClientForm): string[] {
     errors.push('Owner transfer number must use E.164 format, such as +15551234567.');
   }
 
+  if (form.ownerNotificationNumber && !/^\+[1-9]\d{7,14}$/.test(form.ownerNotificationNumber)) {
+    errors.push('Owner notification number must use E.164 format, such as +15551234567.');
+  }
+
   if (form.ownerTransferNumber && form.ownerTransferNumber === form.phoneNumber) {
     errors.push('Owner transfer number must be different from the main phone number.');
   }
@@ -151,6 +181,7 @@ function renderForm(
   options: { title: string; action: string; errors?: string[] },
 ): string {
   const selected = (value: string, expected: string) => (value === expected ? ' selected' : '');
+  const checked = (value: boolean) => (value ? ' checked' : '');
   const e = escapeHtml;
 
   return adminLayout(
@@ -172,7 +203,20 @@ function renderForm(
       </section>
 
       <section class="panel">
-        <div class="section-heading"><span>02</span><div><h2>Booking destination</h2><p>Only the fields for the selected route are saved.</p></div></div>
+        <div class="section-heading"><span>02</span><div><h2>Owner notifications</h2><p>Immediate operational alerts sent from the client's Twilio number.</p></div></div>
+        <div class="form-grid">
+          <label>Owner notification number<input type="tel" name="ownerNotificationNumber" value="${e(form.ownerNotificationNumber)}" placeholder="+15551234567"><small>Leave blank to disable every owner SMS notification.</small></label>
+          <label><input type="checkbox" name="notifyBookingSms"${checked(form.notifyBookingSms)}> Successful bookings</label>
+          <label><input type="checkbox" name="notifyMissedCallSms"${checked(form.notifyMissedCallSms)}> Missed calls</label>
+          <label><input type="checkbox" name="notifyUnbookedCallSms"${checked(form.notifyUnbookedCallSms)}> Completed calls without a booking</label>
+          <label><input type="checkbox" name="notifyFailedBookingSms"${checked(form.notifyFailedBookingSms)}> Failed bookings requiring follow-up</label>
+          <label><input type="checkbox" name="notifyTransferFailureSms"${checked(form.notifyTransferFailureSms)}> Failed owner transfers</label>
+          <label><input type="checkbox" name="dailySummarySms"${checked(form.dailySummarySms)}> Daily activity summary</label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading"><span>03</span><div><h2>Booking destination</h2><p>Only the fields for the selected route are saved.</p></div></div>
         <div class="form-grid">
           <label>Destination type<select name="destinationType" required>
             <option value="zapier"${selected(form.destinationType, 'zapier')}>Zapier</option>
@@ -185,7 +229,7 @@ function renderForm(
       </section>
 
       <section class="panel">
-        <div class="section-heading"><span>03</span><div><h2>Voice agent</h2><p>Provider identity and per-client call instructions.</p></div></div>
+        <div class="section-heading"><span>04</span><div><h2>Voice agent</h2><p>Provider identity and per-client call instructions.</p></div></div>
         <div class="form-grid">
           <label>Provider<select name="voiceProvider" required>
             <option value="vapi"${selected(form.voiceProvider, 'vapi')}>Vapi</option>
@@ -215,6 +259,13 @@ async function saveClient(form: ClientForm, clientId?: string): Promise<string> 
     timezone: form.timezone,
     services,
     missedCallSmsTemplate: form.missedCallSmsTemplate,
+    ownerNotificationNumber: form.ownerNotificationNumber || null,
+    notifyBookingSms: form.notifyBookingSms,
+    notifyMissedCallSms: form.notifyMissedCallSms,
+    notifyUnbookedCallSms: form.notifyUnbookedCallSms,
+    notifyFailedBookingSms: form.notifyFailedBookingSms,
+    notifyTransferFailureSms: form.notifyTransferFailureSms,
+    dailySummarySms: form.dailySummarySms,
   };
 
   return db.$transaction(async (transaction) => {
@@ -343,6 +394,7 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
         voiceAgentConfig: true,
         callLogs: { orderBy: { createdAt: 'desc' }, take: 25 },
         bookingAttempts: { orderBy: { createdAt: 'desc' }, take: 25 },
+        ownerNotifications: { orderBy: { createdAt: 'desc' }, take: 25 },
       },
     });
 
@@ -364,6 +416,13 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
       timezone: client.timezone,
       services: client.services.join(', '),
       missedCallSmsTemplate: client.missedCallSmsTemplate,
+      ownerNotificationNumber: client.ownerNotificationNumber ?? '',
+      notifyBookingSms: client.notifyBookingSms,
+      notifyMissedCallSms: client.notifyMissedCallSms,
+      notifyUnbookedCallSms: client.notifyUnbookedCallSms,
+      notifyFailedBookingSms: client.notifyFailedBookingSms,
+      notifyTransferFailureSms: client.notifyTransferFailureSms,
+      dailySummarySms: client.dailySummarySms,
       destinationType: client.destination?.destinationType ?? 'zapier',
       zapierWebhookUrl: client.destination?.zapierWebhookUrl ?? '',
       zapierAvailabilityWebhookUrl: client.destination?.zapierAvailabilityWebhookUrl ?? '',
@@ -391,6 +450,12 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
           `<tr><td>${formatDate(attempt.createdAt)}</td><td>${e(attempt.source)}</td><td><span class="badge ${attempt.status === 'success' ? 'success' : 'failure'}">${e(attempt.status)}</span></td><td>${e(attempt.deliveredDestinationType ?? attempt.destinationType ?? '—')}</td><td>${attempt.manualFollowUpRequired ? '<span class="badge failure">follow up</span>' : '—'}</td><td>${e(attempt.errorMessage ?? '—')}</td></tr>`,
       )
       .join('');
+    const notificationRows = client.ownerNotifications
+      .map(
+        (notification) =>
+          `<tr><td>${formatDate(notification.createdAt)}</td><td>${e(notification.notificationType.replaceAll('_', ' '))}</td><td class="mono">${e(notification.recipient)}</td><td><span class="badge ${notification.status === 'sent' ? 'success' : notification.status === 'failed' ? 'failure' : 'neutral'}">${e(notification.status)}</span></td><td>${e(notification.errorMessage ?? '—')}</td></tr>`,
+      )
+      .join('');
 
     const formHtml = renderForm(form, {
       title: client.businessName,
@@ -403,6 +468,7 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
     const activity = `<section class="activity stack">
       <section class="panel table-panel"><div class="section-heading"><span>${String(client.callLogs.length).padStart(2, '0')}</span><div><h2>Recent calls</h2><p>Latest 25 call and missed-call SMS events.</p></div></div>${callRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Caller</th><th>Type</th><th>Outcome</th><th>Duration</th><th>SMS</th></tr></thead><tbody>${callRows}</tbody></table></div>` : '<div class="empty">No call activity yet.</div>'}</section>
       <section class="panel table-panel"><div class="section-heading"><span>${String(client.bookingAttempts.length).padStart(2, '0')}</span><div><h2>Recent booking attempts</h2><p>Latest 25 delivery results and fallback flags.</p></div></div>${bookingRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Source</th><th>Status</th><th>Delivered to</th><th>Manual</th><th>Error</th></tr></thead><tbody>${bookingRows}</tbody></table></div>` : '<div class="empty">No booking attempts yet.</div>'}</section>
+      <section class="panel table-panel"><div class="section-heading"><span>${String(client.ownerNotifications.length).padStart(2, '0')}</span><div><h2>Owner notifications</h2><p>Latest 25 owner SMS delivery attempts.</p></div></div>${notificationRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Recipient</th><th>Status</th><th>Error</th></tr></thead><tbody>${notificationRows}</tbody></table></div>` : '<div class="empty">No owner notifications yet.</div>'}</section>
     </section>`;
 
     response.send(

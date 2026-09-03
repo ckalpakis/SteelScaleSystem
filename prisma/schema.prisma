@@ -151,13 +151,20 @@ enum ProspectCallStatus {
 }
 
 model Client {
-  id                    String   @id @default(uuid()) @db.Uuid
-  businessName          String   @map("business_name")
-  phoneNumber           String   @unique @map("phone_number")
-  timezone              String
-  services              String[]
-  missedCallSmsTemplate String   @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
-  createdAt             DateTime @default(now()) @map("created_at")
+  id                       String   @id @default(uuid()) @db.Uuid
+  businessName             String   @map("business_name")
+  phoneNumber              String   @unique @map("phone_number")
+  timezone                 String
+  services                 String[]
+  missedCallSmsTemplate    String   @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
+  ownerNotificationNumber  String?  @map("owner_notification_number")
+  notifyBookingSms         Boolean  @default(true) @map("notify_booking_sms")
+  notifyMissedCallSms      Boolean  @default(true) @map("notify_missed_call_sms")
+  notifyUnbookedCallSms    Boolean  @default(true) @map("notify_unbooked_call_sms")
+  notifyFailedBookingSms   Boolean  @default(true) @map("notify_failed_booking_sms")
+  notifyTransferFailureSms Boolean  @default(true) @map("notify_transfer_failure_sms")
+  dailySummarySms          Boolean  @default(true) @map("daily_summary_sms")
+  createdAt                DateTime @default(now()) @map("created_at")
 
   destination          ClientDestination?
   voiceAgentConfig     VoiceAgentConfig?
@@ -185,6 +192,25 @@ model Client {
   callQueueEntries     CallQueueEntry[]
   callAttempts         CallAttempt[]
   availabilityChecks   AvailabilityCheck[]
+  ownerNotifications   OwnerNotification[]
+}
+
+model OwnerNotification {
+  id               String           @id @default(uuid()) @db.Uuid
+  clientId         String           @map("client_id") @db.Uuid
+  notificationType String           @map("notification_type")
+  eventKey         String           @map("event_key")
+  recipient        String
+  status           SmsAttemptStatus
+  outboundSmsSid   String?          @map("outbound_sms_sid")
+  errorMessage     String?          @map("error_message")
+  attemptedAt      DateTime         @default(now()) @map("attempted_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, notificationType, eventKey])
+  @@index([clientId, createdAt])
 }
 
 model PipelineRun {

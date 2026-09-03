@@ -4,6 +4,7 @@ import { db } from '../db/client.js';
 import type { TwilioVoiceStatusEvent } from '../types/twilio.js';
 import { logger } from '../utils/logger.js';
 import { sendSms } from './twilio-sms.js';
+import { sendOwnerNotification } from './owner-notifications.js';
 
 const MISSED_STATUSES = new Set(['busy', 'canceled', 'failed', 'no-answer']);
 
@@ -94,6 +95,17 @@ export async function processTwilioVoiceStatus(event: TwilioVoiceStatusEvent): P
     await db.callLog.update({
       where: { id: callLog.id },
       data: { smsAttemptStatus: SmsAttemptStatus.failed, smsErrorMessage: message },
+    });
+  }
+
+  if (client.ownerNotificationNumber && client.notifyMissedCallSms) {
+    await sendOwnerNotification({
+      clientId: client.id,
+      from: client.phoneNumber,
+      to: client.ownerNotificationNumber,
+      type: 'missed_call',
+      eventKey: event.callSid,
+      body: `MISSED CALL — ${client.businessName}\nCaller: ${event.from}\nPlease call them back when available.`,
     });
   }
 }

@@ -55,6 +55,8 @@ npm run test:missed-call
 
 The simulator posts a Twilio-style `no-answer` callback for the seeded client, forces SMS dry-run mode, and prints the resulting `CallLog`. A successful row has `smsAttemptStatus: "sent"` and an `outboundSmsSid` beginning with `dry-run-`.
 
+When an owner notification number is configured, the same simulation also verifies a separate, idempotent owner missed-call alert. Successful bookings, failed bookings requiring follow-up, failed owner transfers, and the daily summary can likewise notify the owner according to the per-client controls in `/admin`.
+
 For real messages, leave `TWILIO_SMS_DRY_RUN=false`, configure valid Twilio credentials, and point Twilio's status callback to:
 
 ```text

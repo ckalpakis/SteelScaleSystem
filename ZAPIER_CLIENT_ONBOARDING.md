@@ -28,6 +28,8 @@ Before building anything, collect:
 - Email address that should receive test invitations
 - Owner or manager transfer phone number in E.164 format, such as `+15551234567` (optional)
 - Whether owner calls should use a blind transfer or a warm transfer with a conversation summary
+- Owner notification mobile number in E.164 format
+- Which owner SMS alerts to enable: bookings, missed calls, completed calls without bookings, failed bookings, failed transfers, and daily summaries
 
 Confirm that the client has authorized your Zapier connection to read availability and create events on the selected calendar.
 
@@ -195,10 +197,13 @@ Test with non-production data. Confirm that the event appears once, at the corre
 4. Paste the Booking Zap Catch Hook into **Zapier webhook URL**.
 5. Paste the Availability Zap Catch Hook into **Zapier availability webhook URL**.
 6. Confirm the client's timezone.
-7. If the client wants live escalation, enter the **Owner transfer number** and select the transfer type. Leave the number blank to disable transfers.
-8. Save.
+7. Enter the **Owner notification number** and select the desired SMS alerts. Leaving the number blank disables all owner notifications.
+8. If the client wants live escalation, enter the **Owner transfer number** and select the transfer type. Leave the number blank to disable transfers.
+9. Save.
 
 The transfer number must be different from the main AI phone number and must not forward back to it. Otherwise calls can enter a routing loop. Steel Scale supplies this destination directly to Vapi for each call; do not create a Zap or Railway variable for it.
+
+Owner alerts are sent from the client's main Twilio number only after Steel Scale records the outcome. Webhook retries are deduplicated. Successful-booking alerts contain the caller name, callback number, and appointment time; detailed service information remains in the calendar and admin dashboard.
 
 Do not put either Zapier URL in Railway variables. These are stored per client in PostgreSQL.
 
@@ -241,6 +246,14 @@ Temporarily turn off the Availability Zap. The agent must say availability could
 3. Agree to the transfer and verify the owner phone rings.
 4. Confirm Vapi's call log contains a `transferCall` invocation. An `assistant-forwarded-call` end reason means Vapi initiated the transfer; confirm the receiving carrier completed it as well.
 5. Decline the transfer on a second test call and confirm the agent continues helping.
+
+### Owner-notification test
+
+1. Enable all owner notification checkboxes and enter a mobile number you can inspect.
+2. Complete one test booking and confirm exactly one `NEW BOOKING` SMS arrives.
+3. Trigger one missed call and confirm both messages arrive: the existing caller follow-up and the separate owner alert.
+4. Open the client in `/admin` and confirm both attempts appear under **Owner notifications** with status `sent`.
+5. Trigger `POST /internal/cron/daily-summary` through the configured Railway cron and confirm the owner receives one summary. Repeating the job on the same UTC date must not send a duplicate.
 
 ## 7. Troubleshooting
 

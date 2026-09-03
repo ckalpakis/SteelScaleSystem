@@ -5,11 +5,45 @@ import { db } from '../db/client.js';
 import type { InternalBookingRequest, InternalBookingResult } from '../types/booking.js';
 import { logger } from '../utils/logger.js';
 import { createGhlAppointment } from './ghl.js';
+import { localDateTime, sendOwnerNotification } from './owner-notifications.js';
 import { sendBookingToZapier } from './zapier.js';
 import { alertFailedBooking } from './slack-alerts.js';
 
 interface DeliveryResult {
   externalBookingId?: string;
+}
+
+interface NotificationClient {
+  id: string;
+  businessName: string;
+  phoneNumber: string;
+  timezone: string;
+  ownerNotificationNumber: string | null;
+  notifyBookingSms: boolean;
+  notifyFailedBookingSms: boolean;
+}
+
+async function notifyOwnerOfBooking(
+  client: NotificationClient,
+  request: InternalBookingRequest,
+  bookingAttemptId: string,
+  needsFollowUp = false,
+): Promise<void> {
+  if (!client.ownerNotificationNumber) return;
+  if (needsFollowUp ? !client.notifyFailedBookingSms : !client.notifyBookingSms) return;
+
+  const heading = needsFollowUp ? 'BOOKING FOLLOW-UP NEEDED' : 'NEW BOOKING';
+  const status = needsFollowUp
+    ? 'The calendar could not be fully confirmed. Please contact the caller.'
+    : 'The appointment was added to the calendar.';
+  await sendOwnerNotification({
+    clientId: client.id,
+    from: client.phoneNumber,
+    to: client.ownerNotificationNumber,
+    type: needsFollowUp ? 'booking_follow_up' : 'booking_success',
+    eventKey: bookingAttemptId,
+    body: `${heading} — ${client.businessName}\n${request.customerName} · ${request.phoneNumber}\n${localDateTime(request.preferredTime, client.timezone)}\n${status}`,
+  });
 }
 
 function errorMessage(error: unknown): string {
@@ -89,6 +123,7 @@ export async function createBookingAttempt(
         completedAt: new Date(),
       },
     });
+    await notifyOwnerOfBooking(client, request, bookingAttempt.id);
     return {
       accepted: true,
       bookingAttemptId: bookingAttempt.id,
@@ -143,6 +178,7 @@ export async function createBookingAttempt(
           completedAt: new Date(),
         },
       });
+      await notifyOwnerOfBooking(client, request, bookingAttempt.id);
       return {
         accepted: true,
         bookingAttemptId: bookingAttempt.id,
@@ -184,6 +220,7 @@ export async function createBookingAttempt(
       { bookingAttemptId: bookingAttempt.id, primaryErrorMessage },
       'Booking delivered to safety-net GHL calendar; manual follow-up required',
     );
+    await notifyOwnerOfBooking(client, request, bookingAttempt.id, true);
     return {
       accepted: true,
       bookingAttemptId: bookingAttempt.id,
@@ -226,6 +263,7 @@ export async function createBookingAttempt(
       preferredTime: request.preferredTime,
       error: combinedError,
     });
+    await notifyOwnerOfBooking(client, request, bookingAttempt.id, true);
     return {
       accepted: false,
       bookingAttemptId: bookingAttempt.id,

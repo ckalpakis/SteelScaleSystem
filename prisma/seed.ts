@@ -13,6 +13,7 @@ async function seed(): Promise<void> {
       services: ['HVAC', 'Plumbing', 'Electrical'],
       missedCallSmsTemplate:
         "Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.",
+      ownerNotificationNumber: '+15550102032',
     },
     create: {
       id: '00000000-0000-4000-8000-000000000001',
@@ -22,6 +23,7 @@ async function seed(): Promise<void> {
       services: ['HVAC', 'Plumbing', 'Electrical'],
       missedCallSmsTemplate:
         "Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.",
+      ownerNotificationNumber: '+15550102032',
     },
   });
 
