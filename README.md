@@ -63,6 +63,8 @@ For real messages, leave `TWILIO_SMS_DRY_RUN=false`, configure valid Twilio cred
 POST https://your-public-host/webhooks/twilio/voice-status
 ```
 
+Two-way SMS booking is opt-in per client in `/admin`. Configure the Twilio number's **A message comes in** webhook as `POST https://your-public-host/webhooks/twilio/sms`. An answered call without a booking then sends one customer follow-up; replies are stored, deduplicated, checked against live availability, and delivered through the shared booking workflow. `STOP` opts the number out and `START` resumes it.
+
 ## Test the Vapi booking flow
 
 After migrating and seeding the database, run:

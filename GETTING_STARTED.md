@@ -349,8 +349,17 @@ Test a complete call. Confirm that it creates a `CallLog` and that a spoken book
 6. Ensure the callback is attached to the dialed leg that can return `busy`, `canceled`, `failed`, or `no-answer`.
 7. Match the client's admin phone number exactly to the Twilio E.164 number.
 8. Ensure `TWILIO_SMS_DRY_RUN=false` in Railway.
+9. Under the number's Messaging configuration, set **A message comes in** to:
+
+   ```text
+   APP_URL/webhooks/twilio/sms
+   ```
+
+10. Use HTTP `POST`. This messaging webhook is separate from the incoming voice handler and the voice status callback.
 
 Place a controlled unanswered call. Confirm the caller receives the configured SMS and the admin panel records a sent SMS attempt.
+
+To enable post-call two-way booking, open the client in `/admin`, enable **Two-way SMS booking**, and review the follow-up template. Complete a call without booking, reply to the resulting text, request an unavailable time, select an alternative, and verify a single appointment is created. Also verify `STOP` suppresses further application replies and `START` resumes the conversation.
 
 ## 18. Configure the daily summary
 

@@ -255,6 +255,19 @@ Temporarily turn off the Availability Zap. The agent must say availability could
 4. Open the client in `/admin` and confirm both attempts appear under **Owner notifications** with status `sent`.
 5. Trigger `POST /internal/cron/daily-summary` through the configured Railway cron and confirm the owner receives one summary. Repeating the job on the same UTC date must not send a duplicate.
 
+### Two-way SMS booking test
+
+1. In the client configuration, enable **Two-way SMS booking** and review the no-booking follow-up copy.
+2. In Twilio, set the number's **A message comes in** webhook to `POST https://YOUR-RAILWAY-DOMAIN/webhooks/twilio/sms`. Do not replace the Vapi incoming voice routing.
+3. Complete a call without booking and confirm the caller receives exactly one follow-up SMS.
+4. Reply and complete the requested name, service, address, date, and time. Confirm the assistant uses the caller's mobile number without asking for it again.
+5. Request a blocked time and confirm the reply offers live alternatives without creating an appointment.
+6. Confirm an available time and verify exactly one calendar event, one successful `BookingAttempt` with source `sms`, and the normal owner booking notification.
+7. Text `STOP`, then send another message and confirm the application does not reply. Text `START` to resume.
+8. Open the client in `/admin` and confirm the conversation appears under **SMS booking conversations**.
+
+The Twilio number must support SMS and belong to the same account configured by `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Twilio signs the inbound webhook; `APP_URL` must exactly match the public Railway origin used in the webhook URL.
+
 ## 7. Troubleshooting
 
 ### Agent says availability could not be confirmed

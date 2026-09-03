@@ -52,6 +52,13 @@ async function run(): Promise<void> {
   );
   assert(!unavailable.requestedAvailable, 'unavailable slot rejected');
   assert(unavailable.availableSlots.length === 3, 'nearby alternatives returned');
+  const { spokenAvailabilitySlots } = await import('../src/services/availability-format.js');
+  const spokenSlots = spokenAvailabilitySlots(unavailable.availableSlots, 'America/New_York');
+  assert(spokenSlots[0] === 'Friday, January 15 at 4:30 PM', 'speech-safe slot formatted');
+  assert(
+    spokenSlots.every((slot) => !slot.includes('-')),
+    'speech-safe slots omit ISO hyphens',
+  );
   const { parseZapierAvailabilityCallback } = await import('../src/routes/zapier-availability.js');
   const zapier = parseZapierAvailabilityCallback({
     requested_available: 'false',

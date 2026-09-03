@@ -8,7 +8,9 @@ import { createBookingAttempt } from './bookings.js';
 import { getGhlCalendarAvailability } from './ghl.js';
 import { checkAvailabilityThroughZapier } from './zapier-availability.js';
 import { sendOwnerNotification } from './owner-notifications.js';
+import { sendNoBookingSmsFollowUp } from './sms-booking.js';
 import type { CalendarAvailabilityResult } from '../types/availability.js';
+import { spokenAvailabilitySlots } from './availability-format.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -86,7 +88,17 @@ function renderSystemPrompt(
     ? ' If the caller asks to speak with the owner, a manager, or a human, ask whether they want to be transferred now. Only after the caller explicitly confirms, acknowledge the transfer and invoke the transferCall tool in the same response. Do not invent or say the private destination number.'
     : '';
 
-  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time. Before promising or creating an appointment, call check_availability for the caller's preferred time. If unavailable, offer the returned availableSlots and wait for the caller to choose one. Only call create_booking with a time confirmed available by the tool.${transferInstructions}`;
+  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time. Before promising or creating an appointment, call check_availability for the caller's preferred time. If unavailable, offer the returned spokenAvailableSlots in one natural sentence and wait for the caller to choose one. Never read ISO timestamps, UTC offsets, hyphens, bullets, or list punctuation aloud, and never say "minus" before an appointment time. Use the corresponding availableSlots ISO value when calling create_booking. Only call create_booking with a time confirmed available by the tool.${transferInstructions}`;
+}
+
+function availabilityToolResult(availability: CalendarAvailabilityResult): JsonObject {
+  return {
+    ...availability,
+    spokenAvailableSlots: spokenAvailabilitySlots(
+      availability.availableSlots,
+      availability.timezone,
+    ),
+  };
 }
 
 function ownerTransferTool(number: string, mode: string): JsonObject {
@@ -135,7 +147,7 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
             function: {
               name: 'check_availability',
               description:
-                'Check the live GHL calendar before promising an appointment. If unavailable, offer the returned nearby slots.',
+                'Check the live calendar before promising an appointment. If unavailable, speak the returned spokenAvailableSlots naturally without reading ISO values, offsets, bullets, hyphens, or the word minus.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -278,8 +290,9 @@ export async function logCallEnded(message: JsonObject): Promise<void> {
   });
 
   const endedReason = stringValue(message.endedReason) ?? stringValue(call?.endedReason);
+  const transferAttempted = endedReason?.toLocaleLowerCase('en-US').includes('transfer') === true;
   const transferFailed =
-    endedReason?.toLocaleLowerCase('en-US').includes('transfer') === true &&
+    transferAttempted &&
     (endedReason.toLocaleLowerCase('en-US').includes('fail') ||
       endedReason.toLocaleLowerCase('en-US').includes('error'));
   if (
@@ -310,6 +323,20 @@ export async function logCallEnded(message: JsonObject): Promise<void> {
       eventKey: context.callId,
       body: `NEW CALL — ${context.client.businessName}\nCaller: ${context.callerNumber}\nThe AI handled the call, but no appointment was booked.`,
     });
+  }
+  if (!booking && !transferAttempted) {
+    try {
+      await sendNoBookingSmsFollowUp({
+        clientId: context.client.id,
+        callId: context.callId,
+        customerNumber: context.callerNumber,
+      });
+    } catch (error) {
+      logger.error(
+        { error, clientId: context.client.id, callId: context.callId },
+        'Post-call SMS booking follow-up failed',
+      );
+    }
   }
 }
 
@@ -405,7 +432,11 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
       }
       try {
         const availability = await availabilityFor(context, preferredTime);
-        results.push({ name, toolCallId: id, result: JSON.stringify(availability) });
+        results.push({
+          name,
+          toolCallId: id,
+          result: JSON.stringify(availabilityToolResult(availability)),
+        });
       } catch (error) {
         results.push({
           name,
@@ -441,6 +472,10 @@ export async function handleToolCalls(message: JsonObject): Promise<JsonObject> 
               accepted: false,
               error: 'The requested time is not currently available.',
               availableSlots: availability.availableSlots,
+              spokenAvailableSlots: spokenAvailabilitySlots(
+                availability.availableSlots,
+                availability.timezone,
+              ),
             }),
           });
           continue;

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600" role="img" aria-labelledby="title desc">
+  <title id="title">Client review video placeholder</title>
+  <desc id="desc">A vertical placeholder ready for a client testimonial video.</desc>
+  <rect width="900" height="1600" fill="#071826"/>
+  <path d="M0 1160 900 830v770H0Z" fill="#1769ff"/>
+  <path d="M0 1280 900 950v150L0 1430Z" fill="#63e6ff" opacity=".95"/>
+  <g fill="none" stroke="#fff" stroke-opacity=".13">
+    <path d="M100 0v1600M300 0v1600M500 0v1600M700 0v1600"/>
+    <path d="M0 200h900M0 400h900M0 600h900M0 800h900M0 1000h900M0 1200h900M0 1400h900"/>
+  </g>
+  <circle cx="450" cy="650" r="94" fill="#63e6ff"/>
+  <path d="m430 600 80 50-80 50Z" fill="#071826"/>
+  <text x="450" y="820" fill="#fff" font-family="Arial, sans-serif" font-size="46" text-anchor="middle" font-weight="700">CLIENT REVIEW</text>
+  <text x="450" y="875" fill="#aebfc8" font-family="Arial, sans-serif" font-size="25" text-anchor="middle">Drop in your approved 9:16 video</text>
+</svg>

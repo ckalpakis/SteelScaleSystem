@@ -33,6 +33,18 @@ enum CallOutcome {
 enum BookingSource {
   voice
   chatbot
+  sms
+}
+
+enum SmsConversationStatus {
+  active
+  booked
+  opted_out
+}
+
+enum SmsDirection {
+  inbound
+  outbound
 }
 
 enum BookingStatus {
@@ -157,6 +169,8 @@ model Client {
   timezone                 String
   services                 String[]
   missedCallSmsTemplate    String   @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
+  noBookingSmsTemplate     String   @default("Thanks for calling {business_name}. Would you like to schedule your appointment by text? Reply here and I can help. Reply STOP to opt out.") @map("no_booking_sms_template")
+  smsBookingEnabled        Boolean  @default(false) @map("sms_booking_enabled")
   ownerNotificationNumber  String?  @map("owner_notification_number")
   notifyBookingSms         Boolean  @default(true) @map("notify_booking_sms")
   notifyMissedCallSms      Boolean  @default(true) @map("notify_missed_call_sms")
@@ -193,6 +207,37 @@ model Client {
   callAttempts         CallAttempt[]
   availabilityChecks   AvailabilityCheck[]
   ownerNotifications   OwnerNotification[]
+  smsConversations     SmsConversation[]
+}
+
+model SmsConversation {
+  id             String                @id @default(uuid()) @db.Uuid
+  clientId       String                @map("client_id") @db.Uuid
+  customerNumber String                @map("customer_number")
+  status         SmsConversationStatus @default(active)
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  client   Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messages SmsMessage[]
+
+  @@unique([clientId, customerNumber])
+  @@index([updatedAt])
+}
+
+model SmsMessage {
+  id                String       @id @default(uuid()) @db.Uuid
+  smsConversationId String       @map("sms_conversation_id") @db.Uuid
+  direction         SmsDirection
+  body              String
+  providerMessageId String?      @unique @map("provider_message_id")
+  dedupeKey         String?      @unique @map("dedupe_key")
+  bookingAttemptId  String?      @map("booking_attempt_id") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  conversation SmsConversation @relation(fields: [smsConversationId], references: [id], onDelete: Cascade)
+
+  @@index([smsConversationId, createdAt])
 }
 
 model OwnerNotification {

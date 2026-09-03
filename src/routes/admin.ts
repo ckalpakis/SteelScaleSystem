@@ -19,6 +19,8 @@ type ClientForm = {
   timezone: string;
   services: string;
   missedCallSmsTemplate: string;
+  noBookingSmsTemplate: string;
+  smsBookingEnabled: boolean;
   ownerNotificationNumber: string;
   notifyBookingSms: boolean;
   notifyMissedCallSms: boolean;
@@ -45,6 +47,9 @@ const defaultForm: ClientForm = {
   services: '',
   missedCallSmsTemplate:
     "Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.",
+  noBookingSmsTemplate:
+    'Thanks for calling {business_name}. Would you like to schedule your appointment by text? Reply here and I can help. Reply STOP to opt out.',
+  smsBookingEnabled: false,
   ownerNotificationNumber: '',
   notifyBookingSms: true,
   notifyMissedCallSms: true,
@@ -82,6 +87,8 @@ function parseForm(request: Request): ClientForm {
     timezone: bodyValue(request.body, 'timezone'),
     services: bodyValue(request.body, 'services'),
     missedCallSmsTemplate: bodyValue(request.body, 'missedCallSmsTemplate'),
+    noBookingSmsTemplate: bodyValue(request.body, 'noBookingSmsTemplate'),
+    smsBookingEnabled: bodyChecked(request.body, 'smsBookingEnabled'),
     ownerNotificationNumber: bodyValue(request.body, 'ownerNotificationNumber'),
     notifyBookingSms: bodyChecked(request.body, 'notifyBookingSms'),
     notifyMissedCallSms: bodyChecked(request.body, 'notifyMissedCallSms'),
@@ -125,6 +132,7 @@ function validateForm(form: ClientForm): string[] {
     ['timezone', 'Timezone'],
     ['services', 'Services'],
     ['missedCallSmsTemplate', 'Missed-call SMS template'],
+    ['noBookingSmsTemplate', 'No-booking SMS template'],
     ['agentId', 'Voice agent ID'],
     ['phoneNumberId', 'Voice phone number ID'],
     ['systemPrompt', 'Voice system prompt'],
@@ -199,6 +207,8 @@ function renderForm(
           <label>Timezone<input name="timezone" value="${e(form.timezone)}" placeholder="America/New_York" required></label>
           <label class="wide">Services<textarea name="services" rows="3" placeholder="HVAC repair, Maintenance, Installation" required>${e(form.services)}</textarea><small>Separate services with commas or new lines.</small></label>
           <label class="wide">Missed-call SMS template<textarea name="missedCallSmsTemplate" rows="3" required>${e(form.missedCallSmsTemplate)}</textarea><small>Use <code>{business_name}</code> for the client's business name.</small></label>
+          <label><input type="checkbox" name="smsBookingEnabled"${checked(form.smsBookingEnabled)}> Enable two-way SMS booking</label>
+          <label class="wide">No-booking follow-up SMS<textarea name="noBookingSmsTemplate" rows="3" required>${e(form.noBookingSmsTemplate)}</textarea><small>Sent after an AI-handled call ends without a booking. Replies continue with the SMS booking assistant. Use <code>{business_name}</code>.</small></label>
         </div>
       </section>
 
@@ -259,6 +269,8 @@ async function saveClient(form: ClientForm, clientId?: string): Promise<string> 
     timezone: form.timezone,
     services,
     missedCallSmsTemplate: form.missedCallSmsTemplate,
+    noBookingSmsTemplate: form.noBookingSmsTemplate,
+    smsBookingEnabled: form.smsBookingEnabled,
     ownerNotificationNumber: form.ownerNotificationNumber || null,
     notifyBookingSms: form.notifyBookingSms,
     notifyMissedCallSms: form.notifyMissedCallSms,
@@ -395,6 +407,11 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
         callLogs: { orderBy: { createdAt: 'desc' }, take: 25 },
         bookingAttempts: { orderBy: { createdAt: 'desc' }, take: 25 },
         ownerNotifications: { orderBy: { createdAt: 'desc' }, take: 25 },
+        smsConversations: {
+          orderBy: { updatedAt: 'desc' },
+          take: 25,
+          include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } },
+        },
       },
     });
 
@@ -416,6 +433,8 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
       timezone: client.timezone,
       services: client.services.join(', '),
       missedCallSmsTemplate: client.missedCallSmsTemplate,
+      noBookingSmsTemplate: client.noBookingSmsTemplate,
+      smsBookingEnabled: client.smsBookingEnabled,
       ownerNotificationNumber: client.ownerNotificationNumber ?? '',
       notifyBookingSms: client.notifyBookingSms,
       notifyMissedCallSms: client.notifyMissedCallSms,
@@ -456,6 +475,12 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
           `<tr><td>${formatDate(notification.createdAt)}</td><td>${e(notification.notificationType.replaceAll('_', ' '))}</td><td class="mono">${e(notification.recipient)}</td><td><span class="badge ${notification.status === 'sent' ? 'success' : notification.status === 'failed' ? 'failure' : 'neutral'}">${e(notification.status)}</span></td><td>${e(notification.errorMessage ?? '—')}</td></tr>`,
       )
       .join('');
+    const smsRows = client.smsConversations
+      .map((conversation) => {
+        const latest = conversation.messages[0];
+        return `<tr><td>${formatDate(conversation.updatedAt)}</td><td class="mono">${e(conversation.customerNumber)}</td><td><span class="badge neutral">${e(conversation.status.replaceAll('_', ' '))}</span></td><td>${e(latest?.direction ?? '—')}</td><td>${e(latest?.body ?? '—')}</td></tr>`;
+      })
+      .join('');
 
     const formHtml = renderForm(form, {
       title: client.businessName,
@@ -466,6 +491,7 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
         ? '<div class="notice success-notice">Client configuration saved.</div>'
         : '';
     const activity = `<section class="activity stack">
+      <section class="panel table-panel"><div class="section-heading"><span>${String(client.smsConversations.length).padStart(2, '0')}</span><div><h2>SMS booking conversations</h2><p>Latest customer text conversations and booking status.</p></div></div>${smsRows ? `<div class="table-wrap"><table><thead><tr><th>Updated</th><th>Customer</th><th>Status</th><th>Last direction</th><th>Last message</th></tr></thead><tbody>${smsRows}</tbody></table></div>` : '<div class="empty">No SMS booking conversations yet.</div>'}</section>
       <section class="panel table-panel"><div class="section-heading"><span>${String(client.callLogs.length).padStart(2, '0')}</span><div><h2>Recent calls</h2><p>Latest 25 call and missed-call SMS events.</p></div></div>${callRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Caller</th><th>Type</th><th>Outcome</th><th>Duration</th><th>SMS</th></tr></thead><tbody>${callRows}</tbody></table></div>` : '<div class="empty">No call activity yet.</div>'}</section>
       <section class="panel table-panel"><div class="section-heading"><span>${String(client.bookingAttempts.length).padStart(2, '0')}</span><div><h2>Recent booking attempts</h2><p>Latest 25 delivery results and fallback flags.</p></div></div>${bookingRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Source</th><th>Status</th><th>Delivered to</th><th>Manual</th><th>Error</th></tr></thead><tbody>${bookingRows}</tbody></table></div>` : '<div class="empty">No booking attempts yet.</div>'}</section>
       <section class="panel table-panel"><div class="section-heading"><span>${String(client.ownerNotifications.length).padStart(2, '0')}</span><div><h2>Owner notifications</h2><p>Latest 25 owner SMS delivery attempts.</p></div></div>${notificationRows ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Type</th><th>Recipient</th><th>Status</th><th>Error</th></tr></thead><tbody>${notificationRows}</tbody></table></div>` : '<div class="empty">No owner notifications yet.</div>'}</section>

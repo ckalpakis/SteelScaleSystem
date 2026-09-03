@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Steel Scale builds AI phone agents, automated booking systems, and practical AI workflows for service businesses."
+    />
+    <title>Steel Scale | AI systems that turn calls into booked work</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/site.css" />
+    <script src="/assets/site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="Steel Scale home">
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Steel Scale</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#voice-ai">Voice AI</a>
+        <a href="#systems">AI services</a>
+        <a href="/seo-reviews">Websites, SEO & reviews</a>
+      </nav>
+      <a class="header-cta" href="tel:+14123244254">Call an AI expert</a>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="signal-line"><span></span> AI infrastructure for service businesses</p>
+          <h1>Your best employee should answer every call in two rings.</h1>
+          <p class="hero-lede">
+            Steel Scale installs AI phone agents and automated booking systems that answer, qualify,
+            schedule, follow up, and keep the owner informed—without adding another person to
+            payroll.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-bright" href="#calculator">Calculate missed revenue</a>
+            <a class="text-link" href="#voice-ai">See how the AI works <span>↓</span></a>
+          </div>
+          <dl class="proof-strip" aria-label="Service capabilities">
+            <div>
+              <dt>24/7</dt>
+              <dd>Calls answered</dd>
+            </div>
+            <div>
+              <dt>Live</dt>
+              <dd>Calendar checks</dd>
+            </div>
+            <div>
+              <dt>2-way</dt>
+              <dd>SMS booking</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="hero-console" aria-label="Example AI call workflow">
+          <div class="console-head"><span>AI call handling</span><b>Live</b></div>
+          <div class="call-wave" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span
+            ><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <p class="transcript caller">“I need someone to look at a leaking water heater.”</p>
+          <div class="logic-line">
+            <span>01</span>
+            <p>Identifies service and urgency</p>
+            <b>done</b>
+          </div>
+          <div class="logic-line">
+            <span>02</span>
+            <p>Checks the live calendar</p>
+            <b>done</b>
+          </div>
+          <p class="transcript agent">
+            “I can get you scheduled tomorrow at 10:30 AM. Would you like me to reserve that?”
+          </p>
+          <div class="console-result"><span>Appointment ready</span><strong>10:30 AM</strong></div>
+        </div>
+      </section>
+
+      <section class="authority-band" aria-label="Steel Scale approach">
+        <p>Not another chatbot.</p>
+        <p>Not a generic answering service.</p>
+        <strong>An AI operating layer built around your business.</strong>
+      </section>
+
+      <section class="problem-section" id="voice-ai">
+        <div class="section-intro">
+          <p class="kicker">The expensive silence</p>
+          <h2>When the phone goes unanswered, the customer does not wait.</h2>
+          <p>
+            They call the next company. Your advertising paid for the lead, your reputation earned
+            the call, and a few unanswered rings handed the job to a competitor.
+          </p>
+        </div>
+        <div class="problem-ledger">
+          <div><span>After-hours calls</span><strong>Uncovered</strong></div>
+          <div><span>Busy crews</span><strong>Cannot answer</strong></div>
+          <div><span>Office overload</span><strong>Slow follow-up</strong></div>
+          <div><span>Result</span><strong class="orange">Revenue leaks</strong></div>
+        </div>
+      </section>
+
+      <section class="calculator-section" id="calculator">
+        <div class="calculator-copy">
+          <p class="kicker">Revenue leak calculator</p>
+          <h2>Put a number on the calls slipping through.</h2>
+          <p>
+            Adjust the assumptions to match your business. This estimates revenue opportunity—not a
+            guarantee—but it makes the cost of slow response visible.
+          </p>
+          <ul class="check-list">
+            <li>Every call is answered with your business rules.</li>
+            <li>Qualified customers can book against live availability.</li>
+            <li>Unbooked callers continue by text while intent is fresh.</li>
+            <li>The owner receives the outcome, not another task.</li>
+          </ul>
+        </div>
+        <div class="calculator" data-calculator>
+          <div class="calc-display">
+            <span>Potential monthly revenue missed</span>
+            <output id="revenue-output" aria-live="polite">$0</output>
+            <small>Based on the assumptions below</small>
+          </div>
+          <label>
+            <span>Inbound calls each week <output data-value-for="calls">60</output></span>
+            <input id="calls" type="range" min="5" max="300" value="60" step="5" />
+          </label>
+          <label>
+            <span>Calls missed or delayed <output data-value-for="missed">25%</output></span>
+            <input id="missed" type="range" min="5" max="70" value="25" step="1" />
+          </label>
+          <label>
+            <span>Calls that could become jobs <output data-value-for="close">40%</output></span>
+            <input id="close" type="range" min="5" max="90" value="40" step="1" />
+          </label>
+          <label>
+            <span>Average job value <output data-value-for="job">$750</output></span>
+            <input id="job" type="range" min="100" max="10000" value="750" step="50" />
+          </label>
+          <div class="calc-equation">
+            <span data-missed-calls>0 calls</span><i>×</i><span data-jobs>0 jobs</span><i>×</i
+            ><span>job value</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="system-section" id="systems">
+        <div class="section-intro split-title">
+          <p class="kicker">The Steel Scale AI system</p>
+          <h2>One conversation. Every next step handled.</h2>
+          <p>
+            We map the real path from first contact to booked work, then install AI at the places
+            where attention, speed, and follow-through usually break down.
+          </p>
+        </div>
+        <div class="system-flow">
+          <article>
+            <span>Incoming call</span>
+            <h3>AI answers</h3>
+            <p>Uses your greeting, services, coverage area, and escalation rules.</p>
+          </article>
+          <article>
+            <span>Real intent</span>
+            <h3>AI qualifies</h3>
+            <p>Collects the job details your team actually needs.</p>
+          </article>
+          <article>
+            <span>Live availability</span>
+            <h3>AI schedules</h3>
+            <p>Checks the calendar, handles conflicts, and confirms the appointment.</p>
+          </article>
+          <article>
+            <span>No booking yet</span>
+            <h3>AI follows up</h3>
+            <p>Continues the conversation by text and gives the owner visibility.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="services-section">
+        <div class="section-intro">
+          <p class="kicker">Practical AI services</p>
+          <h2>AI that does work—not AI theater.</h2>
+        </div>
+        <div class="service-list">
+          <article>
+            <span>01</span>
+            <div>
+              <h3>AI voice agents</h3>
+              <p>Answer, qualify, book, transfer, and follow up around the clock.</p>
+            </div>
+          </article>
+          <article>
+            <span>02</span>
+            <div>
+              <h3>AI text booking</h3>
+              <p>Turn unfinished calls and missed connections into scheduled work.</p>
+            </div>
+          </article>
+          <article>
+            <span>03</span>
+            <div>
+              <h3>Workflow automation</h3>
+              <p>Move clean information into the calendar, CRM, and owner notifications.</p>
+            </div>
+          </article>
+          <article>
+            <span>04</span>
+            <div>
+              <h3>AI lead intelligence</h3>
+              <p>Find, organize, score, and prioritize the opportunities worth pursuing.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="testimonial-section" id="proof">
+        <div class="testimonial-copy">
+          <p class="kicker">Client proof</p>
+          <h2>Better visibility creates better growth.</h2>
+          <blockquote>
+            “The goal was not just a better website. It was a system that made the business easier
+            to find, easier to trust, and easier to contact.”
+          </blockquote>
+          <p class="video-note">
+            Replace the included placeholder by adding your approved vertical testimonial video as
+            <code>public/site/client-review.mp4</code>.
+          </p>
+          <a class="text-link dark" href="/seo-reviews"
+            >Explore websites, SEO and reviews <span>↗</span></a
+          >
+        </div>
+        <div class="video-shell">
+          <video controls playsinline preload="metadata" poster="/assets/testimonial-poster.svg">
+            <source src="/assets/client-review.mp4" type="video/mp4" />
+            Your browser does not support embedded video.
+          </video>
+          <span class="video-label">Client review / 9:16</span>
+        </div>
+      </section>
+
+      <section class="bridge-section">
+        <div>
+          <p class="kicker">The gap</p>
+          <h2>Your team should do the work that requires a human.</h2>
+        </div>
+        <p>
+          Let AI handle repetition, immediate response, scheduling, and follow-up. Give your people
+          back the time to serve customers, close opportunities, and run the business.
+        </p>
+      </section>
+
+      <section class="final-cta" id="contact">
+        <p>Start with the leak you can already feel.</p>
+        <h2>Let’s find where AI can save time and recover revenue in your business.</h2>
+        <a class="button button-bright" href="tel:+14123244254">Call +1 (412) 324-4254</a>
+        <small>No generic pitch. We map the workflow first.</small>
+      </section>
+    </main>
+
+    <footer>
+      <a class="wordmark" href="/"
+        ><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span
+        ><span>Steel Scale</span></a
+      >
+      <p>AI systems for businesses that cannot afford to miss the next opportunity.</p>
+      <div>
+        <a href="/seo-reviews">Websites, SEO & reviews</a
+        ><a href="tel:+14123244254">+1 (412) 324-4254</a
+        ><a href="mailto:hello@steelscalesystems.com">Email</a>
+      </div>
+    </footer>
+  </body>
+</html>
