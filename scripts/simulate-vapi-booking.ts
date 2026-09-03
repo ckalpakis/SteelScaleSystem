@@ -42,6 +42,15 @@ async function simulate(): Promise<void> {
       },
     });
     if (!assistantResponse.assistant) throw new Error('Dynamic assistant was not returned');
+    const assistant = assistantResponse.assistant as Record<string, unknown>;
+    const model = assistant.model as Record<string, unknown>;
+    const tools = model.tools as Array<Record<string, unknown>>;
+    const transferTool = tools.find((tool) => tool.type === 'transferCall');
+    if (!transferTool) throw new Error('Owner transfer tool was not returned');
+    const destinations = transferTool.destinations as Array<Record<string, unknown>>;
+    if (destinations[0]?.number !== '+15550102031') {
+      throw new Error('Owner transfer destination was not configured correctly');
+    }
 
     await postJson(webhookUrl, {
       message: { type: 'status-update', status: 'in-progress', call },

@@ -26,6 +26,8 @@ Before building anything, collect:
 - Whether overlapping appointments are allowed
 - Staff member or shared calendar responsible for appointments
 - Email address that should receive test invitations
+- Owner or manager transfer phone number in E.164 format, such as `+15551234567` (optional)
+- Whether owner calls should use a blind transfer or a warm transfer with a conversation summary
 
 Confirm that the client has authorized your Zapier connection to read availability and create events on the selected calendar.
 
@@ -193,7 +195,10 @@ Test with non-production data. Confirm that the event appears once, at the corre
 4. Paste the Booking Zap Catch Hook into **Zapier webhook URL**.
 5. Paste the Availability Zap Catch Hook into **Zapier availability webhook URL**.
 6. Confirm the client's timezone.
-7. Save.
+7. If the client wants live escalation, enter the **Owner transfer number** and select the transfer type. Leave the number blank to disable transfers.
+8. Save.
+
+The transfer number must be different from the main AI phone number and must not forward back to it. Otherwise calls can enter a routing loop. Steel Scale supplies this destination directly to Vapi for each call; do not create a Zap or Railway variable for it.
 
 Do not put either Zapier URL in Railway variables. These are stored per client in PostgreSQL.
 
@@ -228,6 +233,14 @@ Request “tomorrow at 4:30 PM.” Confirm the resulting event is 4:30 PM in the
 ### Failure test
 
 Temporarily turn off the Availability Zap. The agent must say availability could not be confirmed and must not promise the appointment.
+
+### Owner-transfer test
+
+1. Call the Vapi number and ask to speak with the owner.
+2. Confirm the agent asks before transferring instead of transferring immediately.
+3. Agree to the transfer and verify the owner phone rings.
+4. Confirm Vapi's call log contains a `transferCall` invocation. An `assistant-forwarded-call` end reason means Vapi initiated the transfer; confirm the receiving carrier completed it as well.
+5. Decline the transfer on a second test call and confirm the agent continues helping.
 
 ## 7. Troubleshooting
 

@@ -27,6 +27,8 @@ type ClientForm = {
   agentId: string;
   phoneNumberId: string;
   systemPrompt: string;
+  ownerTransferNumber: string;
+  ownerTransferMode: 'blind-transfer' | 'warm-transfer-say-summary';
 };
 
 const defaultForm: ClientForm = {
@@ -44,6 +46,8 @@ const defaultForm: ClientForm = {
   agentId: '',
   phoneNumberId: '',
   systemPrompt: '',
+  ownerTransferNumber: '',
+  ownerTransferMode: 'blind-transfer',
 };
 
 function bodyValue(body: Request['body'], key: string): string {
@@ -68,6 +72,11 @@ function parseForm(request: Request): ClientForm {
     agentId: bodyValue(request.body, 'agentId'),
     phoneNumberId: bodyValue(request.body, 'phoneNumberId'),
     systemPrompt: bodyValue(request.body, 'systemPrompt'),
+    ownerTransferNumber: bodyValue(request.body, 'ownerTransferNumber'),
+    ownerTransferMode:
+      bodyValue(request.body, 'ownerTransferMode') === 'warm-transfer-say-summary'
+        ? 'warm-transfer-say-summary'
+        : 'blind-transfer',
   };
 }
 
@@ -101,6 +110,14 @@ function validateForm(form: ClientForm): string[] {
 
   if (form.phoneNumber && !/^\+[1-9]\d{7,14}$/.test(form.phoneNumber)) {
     errors.push('Phone number must use E.164 format, such as +15551234567.');
+  }
+
+  if (form.ownerTransferNumber && !/^\+[1-9]\d{7,14}$/.test(form.ownerTransferNumber)) {
+    errors.push('Owner transfer number must use E.164 format, such as +15551234567.');
+  }
+
+  if (form.ownerTransferNumber && form.ownerTransferNumber === form.phoneNumber) {
+    errors.push('Owner transfer number must be different from the main phone number.');
   }
 
   if (form.destinationType === 'zapier') {
@@ -176,6 +193,11 @@ function renderForm(
           </select></label>
           <label>Agent ID<input name="agentId" value="${e(form.agentId)}" required></label>
           <label>Provider phone number ID<input name="phoneNumberId" value="${e(form.phoneNumberId)}" required></label>
+          <label>Owner transfer number<input type="tel" name="ownerTransferNumber" value="${e(form.ownerTransferNumber)}" placeholder="+15551234567"><small>Optional. Leave blank to disable live owner transfers. Must not route back to the main AI number.</small></label>
+          <label>Owner transfer type<select name="ownerTransferMode">
+            <option value="blind-transfer"${selected(form.ownerTransferMode, 'blind-transfer')}>Blind transfer</option>
+            <option value="warm-transfer-say-summary"${selected(form.ownerTransferMode, 'warm-transfer-say-summary')}>Warm transfer with summary</option>
+          </select><small>Warm transfer summarizes the conversation to the owner before connecting the caller.</small></label>
           <label class="wide">System prompt<textarea name="systemPrompt" rows="8" required>${e(form.systemPrompt)}</textarea></label>
         </div>
       </section>
@@ -227,12 +249,16 @@ async function saveClient(form: ClientForm, clientId?: string): Promise<string> 
         agentId: form.agentId,
         phoneNumberId: form.phoneNumberId,
         systemPrompt: form.systemPrompt,
+        ownerTransferNumber: form.ownerTransferNumber || null,
+        ownerTransferMode: form.ownerTransferMode,
       },
       update: {
         provider: form.voiceProvider,
         agentId: form.agentId,
         phoneNumberId: form.phoneNumberId,
         systemPrompt: form.systemPrompt,
+        ownerTransferNumber: form.ownerTransferNumber || null,
+        ownerTransferMode: form.ownerTransferMode,
       },
     });
 
@@ -346,6 +372,11 @@ adminRouter.get('/clients/:id', async (request, response, next) => {
       agentId: client.voiceAgentConfig?.agentId ?? '',
       phoneNumberId: client.voiceAgentConfig?.phoneNumberId ?? '',
       systemPrompt: client.voiceAgentConfig?.systemPrompt ?? '',
+      ownerTransferNumber: client.voiceAgentConfig?.ownerTransferNumber ?? '',
+      ownerTransferMode:
+        client.voiceAgentConfig?.ownerTransferMode === 'warm-transfer-say-summary'
+          ? 'warm-transfer-say-summary'
+          : 'blind-transfer',
     };
 
     const callRows = client.callLogs

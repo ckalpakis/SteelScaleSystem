@@ -35,7 +35,11 @@ async function testAdmin(): Promise<void> {
       headers: { authorization },
     });
     const detailHtml = await detail.text();
-    if (detail.status !== 200 || !detailHtml.includes('Recent booking attempts')) {
+    if (
+      detail.status !== 200 ||
+      !detailHtml.includes('Recent booking attempts') ||
+      !detailHtml.includes('Owner transfer number')
+    ) {
       throw new Error('Client detail page did not render operational activity');
     }
 

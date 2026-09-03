@@ -75,12 +75,35 @@ function renderSystemPrompt(
   businessName: string,
   services: string[],
   timezone: string,
+  ownerTransferEnabled: boolean,
 ): string {
   const rendered = template
     .replaceAll('{business_name}', businessName)
     .replaceAll('{services}', services.join(', '));
 
-  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time. Before promising or creating an appointment, call check_availability for the caller's preferred time. If unavailable, offer the returned availableSlots and wait for the caller to choose one. Only call create_booking with a time confirmed available by the tool.`;
+  const transferInstructions = ownerTransferEnabled
+    ? ' If the caller asks to speak with the owner, a manager, or a human, ask whether they want to be transferred now. Only after the caller explicitly confirms, acknowledge the transfer and invoke the transferCall tool in the same response. Do not invent or say the private destination number.'
+    : '';
+
+  return `${rendered}\n\nRuntime scheduling context: The current time is ${new Date().toISOString()} UTC. The business timezone is ${timezone}. Resolve words such as "today" and "tomorrow" using that timezone. Never submit a past appointment time. Before promising or creating an appointment, call check_availability for the caller's preferred time. If unavailable, offer the returned availableSlots and wait for the caller to choose one. Only call create_booking with a time confirmed available by the tool.${transferInstructions}`;
+}
+
+function ownerTransferTool(number: string, mode: string): JsonObject {
+  return {
+    type: 'transferCall',
+    destinations: [
+      {
+        type: 'number',
+        number,
+        description:
+          'The business owner. Use only when the caller explicitly confirms they want to speak with the owner, a manager, or a human now.',
+        message: 'Okay, I’ll connect you with the owner now.',
+        transferPlan: {
+          mode: mode === 'warm-transfer-say-summary' ? mode : 'blind-transfer',
+        },
+      },
+    ],
+  };
 }
 
 export async function buildAssistantResponse(message: JsonObject): Promise<JsonObject> {
@@ -101,6 +124,7 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
               client.businessName,
               client.services,
               client.timezone,
+              Boolean(client.voiceConfig.ownerTransferNumber),
             ),
           },
         ],
@@ -144,6 +168,14 @@ export async function buildAssistantResponse(message: JsonObject): Promise<JsonO
               },
             },
           },
+          ...(client.voiceConfig.ownerTransferNumber
+            ? [
+                ownerTransferTool(
+                  client.voiceConfig.ownerTransferNumber,
+                  client.voiceConfig.ownerTransferMode,
+                ),
+              ]
+            : []),
         ],
       },
       serverMessages: ['status-update', 'end-of-call-report', 'tool-calls'],

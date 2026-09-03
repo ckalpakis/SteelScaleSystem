@@ -252,12 +252,14 @@ model AvailabilityCheck {
 }
 
 model VoiceAgentConfig {
-  id            String        @id @default(uuid()) @db.Uuid
-  clientId      String        @unique @map("client_id") @db.Uuid
-  provider      VoiceProvider
-  agentId       String        @map("agent_id")
-  phoneNumberId String        @map("phone_number_id")
-  systemPrompt  String        @default("You are the helpful phone agent for {business_name}. Services offered: {services}. Greet the caller, confirm what they need, and collect their full name, callback phone number, service address, requested service, and preferred appointment time. Read the details back for confirmation. Only after the caller confirms, call the create_booking tool. Never claim the booking is confirmed unless the tool returns accepted.") @map("system_prompt")
+  id                  String        @id @default(uuid()) @db.Uuid
+  clientId            String        @unique @map("client_id") @db.Uuid
+  provider            VoiceProvider
+  agentId             String        @map("agent_id")
+  phoneNumberId       String        @map("phone_number_id")
+  systemPrompt        String        @default("You are the helpful phone agent for {business_name}. Services offered: {services}. Greet the caller, confirm what they need, and collect their full name, callback phone number, service address, requested service, and preferred appointment time. Read the details back for confirmation. Only after the caller confirms, call the create_booking tool. Never claim the booking is confirmed unless the tool returns accepted.") @map("system_prompt")
+  ownerTransferNumber String?       @map("owner_transfer_number")
+  ownerTransferMode   String        @default("blind-transfer") @map("owner_transfer_mode")
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 

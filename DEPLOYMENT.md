@@ -87,6 +87,7 @@ This project uses Vapi, not Retell.
 7. Save and click **Publish** if Vapi shows unpublished changes.
 8. Open **Phone Numbers**, select the production Vapi number, and confirm it uses this assistant. If using dynamic assistant selection, set the phone number's server URL to the same endpoint instead of assigning a fixed assistant.
 9. Copy the Vapi assistant ID and phone-number ID into that client's `VoiceAgentConfig` through `APP_URL/admin`.
+10. To enable owner escalation, enter a separate E.164 **Owner transfer number** in the client admin form and choose blind or warm-summary transfer. The dynamic assistant response adds Vapi's transfer tool automatically; no separate Vapi Dashboard tool is required.
 
 Make a test call and confirm that a `CallLog` appears in the client's admin detail page.
 

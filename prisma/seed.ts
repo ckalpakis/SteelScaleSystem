@@ -45,6 +45,8 @@ async function seed(): Promise<void> {
       provider: VoiceProvider.vapi,
       agentId: 'vapi_agent_test_001',
       phoneNumberId: 'vapi_phone_test_001',
+      ownerTransferNumber: '+15550102031',
+      ownerTransferMode: 'blind-transfer',
       systemPrompt:
         'You are the helpful phone agent for {business_name}. Services offered: {services}. Greet the caller, confirm what they need, and collect their full name, callback phone number, service address, requested service, and preferred appointment time. Read the details back for confirmation. Only after the caller confirms, call the create_booking tool. Never claim the booking is confirmed unless the tool returns accepted.',
     },
@@ -53,6 +55,8 @@ async function seed(): Promise<void> {
       provider: VoiceProvider.vapi,
       agentId: 'vapi_agent_test_001',
       phoneNumberId: 'vapi_phone_test_001',
+      ownerTransferNumber: '+15550102031',
+      ownerTransferMode: 'blind-transfer',
       systemPrompt:
         'You are the helpful phone agent for {business_name}. Services offered: {services}. Greet the caller, confirm what they need, and collect their full name, callback phone number, service address, requested service, and preferred appointment time. Read the details back for confirmation. Only after the caller confirms, call the create_booking tool. Never claim the booking is confirmed unless the tool returns accepted.',
     },
