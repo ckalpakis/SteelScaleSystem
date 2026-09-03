@@ -363,6 +363,8 @@ Test desktop, mobile, conversation persistence, and one controlled booking befor
 
 ## 12. Configure GHL and Zapier booking delivery
 
+For the complete repeatable client procedure, use [`ZAPIER_CLIENT_ONBOARDING.md`](./ZAPIER_CLIENT_ONBOARDING.md).
+
 ### GHL safety net
 
 In the appropriate GHL location:
