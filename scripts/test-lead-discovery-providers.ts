@@ -40,6 +40,57 @@ async function run(): Promise<void> {
   });
   assert(outscraper.records.length === 1, 'Outscraper minimum reviews applied');
 
+  let outscraperPoll = 0;
+  const asynchronousOutscraperFetch: typeof fetch = (input) => {
+    const polling = requestUrl(input).includes('/requests/');
+    if (polling) outscraperPoll += 1;
+    return Promise.resolve(
+      new Response(
+        JSON.stringify(
+          polling && outscraperPoll >= 2
+            ? { id: 'async-request', status: 'Success', data: [[{ name: 'Async Plumber' }]] }
+            : { id: 'async-request', status: 'Pending' },
+        ),
+        { status: polling ? 200 : 202, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+  };
+  const asynchronousOutscraper = await new OutscraperDiscoveryProvider(
+    'outscraper-test',
+    asynchronousOutscraperFetch,
+    { intervalMs: 0, maximumAttempts: 3 },
+    () => Promise.resolve(),
+  ).discover({
+    kind: 'outscraper_google_maps',
+    keywords: ['plumber'],
+    locations: ['Pittsburgh PA'],
+    maximumResults: 10,
+  });
+  assert(outscraperPoll === 2, 'Outscraper pending request should be polled until success');
+  assert(asynchronousOutscraper.records.length === 1, 'Outscraper async results returned');
+
+  const emptySuccessfulOutscraper = await new OutscraperDiscoveryProvider(
+    'outscraper-test',
+    () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ id: 'empty-request', status: 'Success', data: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    { intervalMs: 0, maximumAttempts: 1 },
+    () => Promise.resolve(),
+  ).discover({
+    kind: 'outscraper_google_maps',
+    keywords: ['impossible niche'],
+    locations: ['Pittsburgh PA'],
+    maximumResults: 10,
+  });
+  assert(
+    emptySuccessfulOutscraper.records.length === 0,
+    'Outscraper successful empty result should not be treated as a timeout',
+  );
+
   let apifyCall = 0;
   const apifyFetch: typeof fetch = (input) => {
     apifyCall += 1;

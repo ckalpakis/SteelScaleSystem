@@ -10,6 +10,8 @@ export class OutscraperDiscoveryProvider implements DiscoveryProvider {
   constructor(
     private readonly apiKey = env.OUTSCRAPER_API_KEY,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly polling = { intervalMs: 5_000, maximumAttempts: 120 },
+    private readonly sleeper: (milliseconds: number) => Promise<void> = wait,
   ) {}
 
   async discover(rawConfig: OutscraperSearchConfig) {
@@ -32,8 +34,15 @@ export class OutscraperDiscoveryProvider implements DiscoveryProvider {
     );
     const initial = objectValue(body);
     const requestId = typeof initial?.id === 'string' ? initial.id : undefined;
-    for (let poll = 0; requestId && recordsFrom(body).length === 0 && poll < 60; poll += 1) {
-      await wait(2_000);
+    let status = String(initial?.status ?? '').toLocaleLowerCase('en-US');
+    for (
+      let poll = 0;
+      requestId &&
+      !['success', 'completed', 'finished'].includes(status) &&
+      poll < this.polling.maximumAttempts;
+      poll += 1
+    ) {
+      await this.sleeper(this.polling.intervalMs);
       body = await providerJson(
         new URL(
           `/requests/${encodeURIComponent(requestId)}`,
@@ -43,15 +52,15 @@ export class OutscraperDiscoveryProvider implements DiscoveryProvider {
         this.fetcher,
       );
       const rawStatus = objectValue(body)?.status;
-      const status = (typeof rawStatus === 'string' ? rawStatus : '').toLocaleLowerCase('en-US');
+      status = (typeof rawStatus === 'string' ? rawStatus : '').toLocaleLowerCase('en-US');
       if (['error', 'failed', 'cancelled'].includes(status))
         throw new Error(`Outscraper job ${status}`);
     }
     let records = recordsFrom(body);
-    if (requestId && records.length === 0) {
-      const rawStatus = objectValue(body)?.status;
-      const status = typeof rawStatus === 'string' ? rawStatus : 'pending';
-      throw new Error(`Outscraper request returned no results before timeout (${status})`);
+    if (requestId && !['success', 'completed', 'finished'].includes(status)) {
+      throw new Error(
+        `Outscraper request did not finish within ${Math.round((this.polling.intervalMs * this.polling.maximumAttempts) / 60_000)} minutes (${status || 'pending'})`,
+      );
     }
     if (rawConfig.minimumReviews !== undefined) {
       records = records.filter((record) => {
