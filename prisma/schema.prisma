@@ -954,7 +954,7 @@ model RealEstateAgent {
   leadId               String   @unique @map("lead_id") @db.Uuid
   firstName            String?  @map("first_name")
   lastName             String?  @map("last_name")
-  fullName             String
+  fullName             String   @map("full_name")
   normalizedName       String   @map("normalized_name")
   phone                String?
   normalizedPhone      String?  @map("normalized_phone")
