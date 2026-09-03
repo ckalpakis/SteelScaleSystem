@@ -12,3 +12,7 @@ marketingRouter.get('/', (_request, response) => {
 marketingRouter.get('/seo-reviews', (_request, response) => {
   response.sendFile(path.join(siteRoot, 'seo-reviews.html'));
 });
+
+marketingRouter.get('/thank-you', (_request, response) => {
+  response.sendFile(path.join(siteRoot, 'thank-you.html'));
+});

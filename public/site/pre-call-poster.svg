@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Steel Scale Systems pre-call briefing</title><desc id="desc">A branded video placeholder for the required pre-call video.</desc>
+  <rect width="1600" height="900" fill="#071826"/><path d="M0 900 1600 300v600Z" fill="#1769ff" opacity=".72"/><path d="m0 760 1600-410v95L0 855Z" fill="#63e6ff" opacity=".9"/>
+  <g fill="none" stroke="#fff" stroke-opacity=".11"><path d="M200 0v900M500 0v900M800 0v900M1100 0v900M1400 0v900"/><path d="M0 180h1600M0 360h1600M0 540h1600M0 720h1600"/></g>
+  <circle cx="800" cy="420" r="82" fill="#63e6ff"/><path d="m775 376 76 44-76 44Z" fill="#071826"/>
+  <text x="800" y="590" fill="#fff" font-family="Arial, sans-serif" font-size="51" font-weight="700" text-anchor="middle">YOUR PRE-CALL BRIEFING</text><text x="800" y="647" fill="#bdd0d9" font-family="Arial, sans-serif" font-size="25" text-anchor="middle">Watch before your Steel Scale Systems strategy call</text>
+</svg>
