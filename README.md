@@ -83,6 +83,10 @@ For production, create a Vapi custom Bearer credential using `VAPI_WEBHOOK_SECRE
 
 PostgreSQL stores chatbot sessions and messages so conversation state survives application restarts and works across multiple app instances without adding Redis infrastructure.
 
+The marketing site loads the chatbot on every public page. Set `WEBSITE_CHATBOT_CLIENT_ID` to
+the database client whose services, timezone, booking destination, and assistant context the site
+should use. Local development falls back to the deterministic seeded client ID.
+
 For a no-cost local tool-call test, set these values in `.env`:
 
 ```text
