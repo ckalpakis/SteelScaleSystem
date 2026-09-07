@@ -1,0 +1,4 @@
+NOT EXECUTED SUCCESSFULLY: browser navigation was blocked by the authoring environment.
+file:// preview attempt: net::ERR_BLOCKED_BY_ADMINISTRATOR
+local HTTP preview attempt: net::ERR_BLOCKED_BY_ADMINISTRATOR
+No browser interaction or responsive-layout pass is claimed. Run browser_check.py in an authorized environment that permits local navigation, then test the real Express application.

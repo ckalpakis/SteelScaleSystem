@@ -2,6 +2,8 @@ import express from 'express';
 import pinoHttp from 'pino-http';
 import path from 'node:path';
 
+import { demoAdminRouter, demoPublicRouter } from './demo-engine/routes.js';
+
 import { healthRouter } from './routes/health.js';
 import { chatbotRouter } from './routes/chatbot.js';
 import { adminRouter } from './routes/admin.js';
@@ -19,6 +21,10 @@ registerConfiguredLeadDiscoveryProviders();
 export const app = express();
 
 app.disable('x-powered-by');
+// Demo routes own parsing, authentication, and redacted error handling. Mount them before
+// generic request logging so private form bodies and bearer share tokens are not logged here.
+app.use('/admin/demos', demoAdminRouter);
+app.use('/demo', demoPublicRouter);
 app.use(pinoHttp({ logger }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());

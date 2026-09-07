@@ -1,0 +1,316 @@
+TAP version 13
+# Subtest: a standalone demo requires no prospect or production client
+ok 1 - a standalone demo requires no prospect or production client
+  ---
+  duration_ms: 1.406497
+  type: 'test'
+  ...
+# Subtest: manual prospect link remains optional
+ok 2 - manual prospect link remains optional
+  ---
+  duration_ms: 0.342285
+  type: 'test'
+  ...
+# Subtest: name and niche are required
+ok 3 - name and niche are required
+  ---
+  duration_ms: 0.258259
+  type: 'test'
+  ...
+# Subtest: input rejects arrays, nonstrings, oversize notes and malformed ids
+ok 4 - input rejects arrays, nonstrings, oversize notes and malformed ids
+  ---
+  duration_ms: 0.196035
+  type: 'test'
+  ...
+# Subtest: manual modules are deduplicated
+ok 5 - manual modules are deduplicated
+  ---
+  duration_ms: 0.597029
+  type: 'test'
+  ...
+# Subtest: unknown and empty manual modules fail rather than silently enabling features
+ok 6 - unknown and empty manual modules fail rather than silently enabling features
+  ---
+  duration_ms: 0.147391
+  type: 'test'
+  ...
+# Subtest: notes about nurture prioritize response over lead generation
+ok 7 - notes about nurture prioritize response over lead generation
+  ---
+  duration_ms: 0.200242
+  type: 'test'
+  ...
+# Subtest: missed calls produce a different recommendation
+ok 8 - missed calls produce a different recommendation
+  ---
+  duration_ms: 0.157067
+  type: 'test'
+  ...
+# Subtest: private notes, prospect ids and business phone never enter public payload or HTML
+ok 9 - private notes, prospect ids and business phone never enter public payload or HTML
+  ---
+  duration_ms: 0.750179
+  type: 'test'
+  ...
+# Subtest: input object is not mutated by generation
+ok 10 - input object is not mutated by generation
+  ---
+  duration_ms: 0.33241
+  type: 'test'
+  ...
+# Subtest: operator services and illustrative templates remain distinct
+ok 11 - operator services and illustrative templates remain distinct
+  ---
+  duration_ms: 0.190968
+  type: 'test'
+  ...
+# Subtest: website is optional and no fabricated audit score is supplied
+ok 12 - website is optional and no fabricated audit score is supplied
+  ---
+  duration_ms: 0.101473
+  type: 'test'
+  ...
+# Subtest: HTML evidence is sourced and qualified
+ok 13 - HTML evidence is sourced and qualified
+  ---
+  duration_ms: 1.18948
+  type: 'test'
+  ...
+# Subtest: script and HTML content do not execute in extracted text
+ok 14 - script and HTML content do not execute in extracted text
+  ---
+  duration_ms: 0.284848
+  type: 'test'
+  ...
+# Subtest: script injection is escaped in every rendered user field
+ok 15 - script injection is escaped in every rendered user field
+  ---
+  duration_ms: 0.206931
+  type: 'test'
+  ...
+# Subtest: preview has no analytics endpoint
+ok 16 - preview has no analytics endpoint
+  ---
+  duration_ms: 0.133671
+  type: 'test'
+  ...
+# Subtest: public demo sends only pseudonymous allowlisted interactions
+ok 17 - public demo sends only pseudonymous allowlisted interactions
+  ---
+  duration_ms: 0.77027
+  type: 'test'
+  ...
+# Subtest: URL normalization only permits HTTP and HTTPS without credentials
+ok 18 - URL normalization only permits HTTP and HTTPS without credentials
+  ---
+  duration_ms: 0.27216
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 127.0.0.1
+ok 19 - website fetch rejects nonpublic 127.0.0.1
+  ---
+  duration_ms: 0.33217
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 10.1.2.3
+ok 20 - website fetch rejects nonpublic 10.1.2.3
+  ---
+  duration_ms: 0.127793
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 172.16.0.1
+ok 21 - website fetch rejects nonpublic 172.16.0.1
+  ---
+  duration_ms: 0.068583
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 192.168.1.1
+ok 22 - website fetch rejects nonpublic 192.168.1.1
+  ---
+  duration_ms: 0.037737
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 169.254.169.254
+ok 23 - website fetch rejects nonpublic 169.254.169.254
+  ---
+  duration_ms: 0.03287
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 100.64.0.1
+ok 24 - website fetch rejects nonpublic 100.64.0.1
+  ---
+  duration_ms: 0.03274
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 0.0.0.0
+ok 25 - website fetch rejects nonpublic 0.0.0.0
+  ---
+  duration_ms: 0.029194
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 192.0.2.1
+ok 26 - website fetch rejects nonpublic 192.0.2.1
+  ---
+  duration_ms: 0.028914
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 198.51.100.2
+ok 27 - website fetch rejects nonpublic 198.51.100.2
+  ---
+  duration_ms: 0.031958
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 203.0.113.7
+ok 28 - website fetch rejects nonpublic 203.0.113.7
+  ---
+  duration_ms: 0.079139
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 198.18.1.1
+ok 29 - website fetch rejects nonpublic 198.18.1.1
+  ---
+  duration_ms: 0.040762
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 224.0.0.1
+ok 30 - website fetch rejects nonpublic 224.0.0.1
+  ---
+  duration_ms: 0.031387
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 255.255.255.255
+ok 31 - website fetch rejects nonpublic 255.255.255.255
+  ---
+  duration_ms: 0.035683
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic ::1
+ok 32 - website fetch rejects nonpublic ::1
+  ---
+  duration_ms: 3.449361
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic ::
+ok 33 - website fetch rejects nonpublic ::
+  ---
+  duration_ms: 0.05291
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic ::ffff:127.0.0.1
+ok 34 - website fetch rejects nonpublic ::ffff:127.0.0.1
+  ---
+  duration_ms: 0.0395
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic ::ffff:7f00:1
+ok 35 - website fetch rejects nonpublic ::ffff:7f00:1
+  ---
+  duration_ms: 0.032118
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic fc00::1
+ok 36 - website fetch rejects nonpublic fc00::1
+  ---
+  duration_ms: 0.033331
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic fe80::1
+ok 37 - website fetch rejects nonpublic fe80::1
+  ---
+  duration_ms: 0.029204
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 2001:db8::1
+ok 38 - website fetch rejects nonpublic 2001:db8::1
+  ---
+  duration_ms: 0.063235
+  type: 'test'
+  ...
+# Subtest: website fetch rejects nonpublic 2002:7f00:1::
+ok 39 - website fetch rejects nonpublic 2002:7f00:1::
+  ---
+  duration_ms: 0.060782
+  type: 'test'
+  ...
+# Subtest: public address accepted: 8.8.8.8
+ok 40 - public address accepted: 8.8.8.8
+  ---
+  duration_ms: 0.064357
+  type: 'test'
+  ...
+# Subtest: public address accepted: 1.1.1.1
+ok 41 - public address accepted: 1.1.1.1
+  ---
+  duration_ms: 0.031438
+  type: 'test'
+  ...
+# Subtest: public address accepted: 2606:4700:4700::1111
+ok 42 - public address accepted: 2606:4700:4700::1111
+  ---
+  duration_ms: 0.03334
+  type: 'test'
+  ...
+# Subtest: literal and special hostname handling is conservative
+ok 43 - literal and special hostname handling is conservative
+  ---
+  duration_ms: 0.356046
+  type: 'test'
+  ...
+# Subtest: ROI accounts for recovery, qualification, conversion, margin and fee separately
+ok 44 - ROI accounts for recovery, qualification, conversion, margin and fee separately
+  ---
+  duration_ms: 0.17271
+  type: 'test'
+  ...
+# Subtest: zero recovery and zero margin do not fabricate revenue or break-even
+ok 45 - zero recovery and zero margin do not fabricate revenue or break-even
+  ---
+  duration_ms: 0.089855
+  type: 'test'
+  ...
+# Subtest: ROI rejects nonfinite, negative, out-of-range and incomplete data
+ok 46 - ROI rejects nonfinite, negative, out-of-range and incomplete data
+  ---
+  duration_ms: 0.12617
+  type: 'test'
+  ...
+# Subtest: drafts, archives and expired demos are inaccessible
+ok 47 - drafts, archives and expired demos are inaccessible
+  ---
+  duration_ms: 0.357418
+  type: 'test'
+  ...
+# Subtest: CSRF token binds secret, credential and action, and expires
+ok 48 - CSRF token binds secret, credential and action, and expires
+  ---
+  duration_ms: 1.187588
+  type: 'test'
+  ...
+# Subtest: public token is long and IDs are validated
+ok 49 - public token is long and IDs are validated
+  ---
+  duration_ms: 0.147903
+  type: 'test'
+  ...
+# Subtest: HTML helper escapes both quote types
+ok 50 - HTML helper escapes both quote types
+  ---
+  duration_ms: 0.104798
+  type: 'test'
+  ...
+# Subtest: no-extraction evidence is explicit about GBP limitation
+ok 51 - no-extraction evidence is explicit about GBP limitation
+  ---
+  duration_ms: 0.092729
+  type: 'test'
+  ...
+1..51
+# tests 51
+# suites 0
+# pass 51
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 88.80279

@@ -1,0 +1,249 @@
+/* eslint-disable @typescript-eslint/no-floating-promises -- node:test registrations are intentionally top-level. */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  parseInput,
+  recommendModules,
+  normalizeBusinessUrl,
+  generatePresentation,
+  extractEvidence,
+  emptyEvidence,
+  calculateRoi,
+  canView,
+  escapeHtml,
+  UUID,
+  TOKEN,
+} from './core.js';
+import { signForm, verifyForm } from './security.js';
+import { isPublicAddress, permittedHostname } from './website.js';
+import { publicView } from './views.js';
+const raw = {
+  businessName: 'Example Insurance Agency',
+  niche: 'insurance',
+  selectionMode: 'recommended',
+  salesNotes: 'PRIVATE_SENTINEL — Facebook leads need follow-up.',
+  businessPhone: '+15555550100',
+  prospectBusinessId: '11111111-1111-4111-8111-111111111111',
+};
+test('a standalone demo requires no prospect or production client', () => {
+  const input = parseInput({
+    businessName: 'Example',
+    niche: 'plumbing',
+    selectionMode: 'recommended',
+  });
+  assert.equal(input.prospectBusinessId, '');
+  assert.equal(input.websiteUrl, '');
+  assert.ok(generatePresentation(input).modules.length);
+});
+test('manual prospect link remains optional', () => {
+  assert.equal(parseInput(raw).prospectBusinessId, raw.prospectBusinessId);
+});
+test('name and niche are required', () => {
+  assert.throws(() => parseInput({ ...raw, niche: '' }));
+  assert.throws(() => parseInput({ ...raw, businessName: '' }));
+});
+test('input rejects arrays, nonstrings, oversize notes and malformed ids', () => {
+  for (const value of [
+    null,
+    [],
+    { ...raw, businessName: ['x'] },
+    { ...raw, salesNotes: 'x'.repeat(6001) },
+    { ...raw, prospectBusinessId: 'wrong' },
+  ])
+    assert.throws(() => parseInput(value));
+});
+test('manual modules are deduplicated', () => {
+  assert.deepEqual(
+    parseInput({ ...raw, selectionMode: 'custom', modules: ['roi', 'roi'] }).modules,
+    ['roi'],
+  );
+});
+test('unknown and empty manual modules fail rather than silently enabling features', () => {
+  for (const modules of [[], ['white_label'], ['toString'], ['constructor']])
+    assert.throws(() => parseInput({ ...raw, selectionMode: 'custom', modules }));
+});
+test('notes about nurture prioritize response over lead generation', () => {
+  assert.deepEqual(recommendModules('insurance', 'Facebook lead form follow-up'), [
+    'nurture',
+    'chatbot',
+    'roi',
+  ]);
+});
+test('missed calls produce a different recommendation', () => {
+  assert.ok(recommendModules('plumbing', 'missed calls after hours').includes('missed_call'));
+});
+test('private notes, prospect ids and business phone never enter public payload or HTML', () => {
+  const input = parseInput(raw);
+  const p = generatePresentation(input);
+  const outputs = [JSON.stringify(p), publicView(p, '', true)];
+  for (const output of outputs)
+    for (const secret of [
+      'PRIVATE_SENTINEL',
+      raw.prospectBusinessId,
+      raw.businessPhone,
+      'salesNotes',
+    ])
+      assert.ok(!output.includes(secret));
+});
+test('input object is not mutated by generation', () => {
+  const input = parseInput(raw);
+  const before = JSON.stringify(input);
+  generatePresentation(input);
+  assert.equal(JSON.stringify(input), before);
+});
+test('operator services and illustrative templates remain distinct', () => {
+  assert.equal(generatePresentation(parseInput(raw)).servicesSource, 'illustrative_template');
+  const p = generatePresentation(
+    parseInput({ ...raw, services: 'Policy consultation, Policy consultation\nRenewal review' }),
+  );
+  assert.equal(p.servicesSource, 'operator');
+  assert.deepEqual(p.services, ['Policy consultation', 'Renewal review']);
+});
+test('website is optional and no fabricated audit score is supplied', () => {
+  const p = generatePresentation(parseInput(raw));
+  assert.equal(p.websiteEvidence.status, 'not_requested');
+  assert.ok(!('score' in p.websiteEvidence));
+});
+test('HTML evidence is sourced and qualified', () => {
+  const result = extractEvidence(
+    '<title>Sample &amp; Co</title><meta name="description" content="Sample company"><meta name="viewport" content="width=device-width"><a href="tel:123">Call</a>',
+    'https://example.com',
+    '2026-09-07T00:00:00.000Z',
+  );
+  assert.equal(result.title, 'Sample & Co');
+  assert.equal(result.description, 'Sample company');
+  assert.ok(result.warning.includes('not a Lighthouse'));
+  assert.equal(result.observations.length, 5);
+});
+test('script and HTML content do not execute in extracted text', () => {
+  assert.equal(
+    extractEvidence('<title><script>alert(1)</script>Hello</title>', '', '').title,
+    'Hello',
+  );
+});
+test('script injection is escaped in every rendered user field', () => {
+  const payload = '<script>alert("INJECTED")</script>';
+  const p = generatePresentation(
+    parseInput({
+      ...raw,
+      businessName: payload,
+      services: payload,
+      publicSummary: payload,
+      hours: payload,
+    }),
+  );
+  const html = publicView(p, '', true);
+  assert.ok(!html.includes(payload));
+  assert.ok(html.includes('&lt;script&gt;'));
+});
+test('preview has no analytics endpoint', () => {
+  const html = publicView(generatePresentation(parseInput(raw)), '/should-not-use', true);
+  assert.ok(html.includes('data-events=""'));
+  assert.ok(!html.includes('/should-not-use'));
+});
+test('public demo sends only pseudonymous allowlisted interactions', () => {
+  const html = publicView(generatePresentation(parseInput(raw)), '/demo/test/events', false);
+  assert.ok(html.includes('sessionKey:session,kind'));
+  assert.ok(!html.includes('innerHTML'));
+  assert.ok(!html.includes('/internal/bookings'));
+  assert.ok(!html.includes('/chatbot'));
+});
+test('URL normalization only permits HTTP and HTTPS without credentials', () => {
+  assert.equal(normalizeBusinessUrl('example.com/path#anchor'), 'https://example.com/path');
+  for (const value of [
+    'file:///etc/passwd',
+    'javascript:alert(1)://x',
+    'https://user:password@example.com',
+    'http://example.com:3000',
+  ])
+    assert.throws(() => normalizeBusinessUrl(value));
+});
+for (const ip of [
+  '127.0.0.1',
+  '10.1.2.3',
+  '172.16.0.1',
+  '192.168.1.1',
+  '169.254.169.254',
+  '100.64.0.1',
+  '0.0.0.0',
+  '192.0.2.1',
+  '198.51.100.2',
+  '203.0.113.7',
+  '198.18.1.1',
+  '224.0.0.1',
+  '255.255.255.255',
+  '::1',
+  '::',
+  '::ffff:127.0.0.1',
+  '::ffff:7f00:1',
+  'fc00::1',
+  'fe80::1',
+  '2001:db8::1',
+  '2002:7f00:1::',
+])
+  test(`website fetch rejects nonpublic ${ip}`, () => assert.equal(isPublicAddress(ip), false));
+for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111'])
+  test(`public address accepted: ${ip}`, () => assert.equal(isPublicAddress(ip), true));
+test('literal and special hostname handling is conservative', () => {
+  for (const host of [
+    'localhost',
+    'foo.internal',
+    '127.0.0.1',
+    '[::1]',
+    'metadata',
+    'foo.onion',
+    'foo.invalid',
+  ])
+    assert.equal(permittedHostname(host), false);
+  assert.equal(permittedHostname('www.example.com'), true);
+});
+test('ROI accounts for recovery, qualification, conversion, margin and fee separately', () => {
+  const result = calculateRoi([20, 50, 50, 50, 1000, 40, 500]);
+  assert.equal(result.recoveredRevenue, 2500);
+  assert.equal(result.contributionAfterFee, 500);
+  assert.equal(result.breakEvenJobs, 2);
+});
+test('zero recovery and zero margin do not fabricate revenue or break-even', () => {
+  assert.equal(calculateRoi([20, 0, 50, 50, 1000, 40, 500]).recoveredRevenue, 0);
+  assert.equal(calculateRoi([20, 50, 50, 50, 1000, 0, 500]).breakEvenJobs, null);
+});
+test('ROI rejects nonfinite, negative, out-of-range and incomplete data', () => {
+  for (const values of [
+    [1],
+    [-1, 50, 50, 50, 1000, 40, 500],
+    [20, 101, 50, 50, 1000, 40, 500],
+    [Infinity, 50, 50, 50, 1000, 40, 500],
+    [NaN, 50, 50, 50, 1000, 40, 500],
+  ])
+    assert.throws(() => calculateRoi(values));
+});
+test('drafts, archives and expired demos are inaccessible', () => {
+  const now = new Date('2026-09-07T12:00:00Z');
+  assert.equal(canView('draft', new Date('2027-01-01'), now), false);
+  assert.equal(canView('archived', new Date('2027-01-01'), now), false);
+  assert.equal(canView('published', now, now), false);
+  assert.equal(canView('published', null, now), false);
+  assert.equal(canView('published', new Date('2027-01-01'), now), true);
+});
+test('CSRF token binds secret, credential and action, and expires', () => {
+  const now = 1788796800000;
+  const token = signForm('secret', 'Basic abc', 'create', now);
+  assert.equal(verifyForm(token, 'secret', 'Basic abc', 'create', now + 1), true);
+  assert.equal(verifyForm(token, 'other', 'Basic abc', 'create', now), false);
+  assert.equal(verifyForm(token, 'secret', 'Basic def', 'create', now), false);
+  assert.equal(verifyForm(token, 'secret', 'Basic abc', 'publish', now), false);
+  assert.equal(verifyForm(token, 'secret', 'Basic abc', 'create', now + 3600001), false);
+  assert.equal(verifyForm(token + 'a', 'secret', 'Basic abc', 'create', now), false);
+});
+test('public token is long and IDs are validated', () => {
+  assert.ok(TOKEN.test('a'.repeat(64)));
+  assert.ok(!TOKEN.test('a'.repeat(16)));
+  assert.ok(UUID.test(raw.prospectBusinessId));
+  assert.ok(!UUID.test('anything'));
+});
+test('HTML helper escapes both quote types', () => {
+  assert.equal(escapeHtml(`<>"'&`), '&lt;&gt;&quot;&#39;&amp;');
+});
+test('no-extraction evidence is explicit about GBP limitation', () => {
+  assert.ok(emptyEvidence().warning.includes('not fetched'));
+});

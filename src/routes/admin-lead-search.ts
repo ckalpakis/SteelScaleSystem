@@ -10,6 +10,14 @@ import { adminLayout, escapeHtml } from '../utils/html.js';
 
 export const adminLeadSearchRouter = Router();
 
+function errorSummary(value: unknown): string {
+  const candidate =
+    value && typeof value === 'object' && 'message' in value ? value.message : value;
+  if (typeof candidate === 'string') return candidate;
+  if (typeof candidate === 'number' || typeof candidate === 'boolean') return String(candidate);
+  return 'Unknown pipeline error';
+}
+
 function body(request: Request, key: string): string {
   const value = (request.body as Record<string, unknown> | undefined)?.[key];
   return typeof value === 'string' ? value.trim() : '';
@@ -81,7 +89,7 @@ adminLeadSearchRouter.get('/runs/:runId', async (request, response, next) => {
     return response.send(
       adminLayout(
         'Lead Pipeline Status',
-        `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads/search">← New search</a><h1>${active ? 'Pipeline is running' : `Pipeline ${escapeHtml(run.status)}`}</h1><p>${escapeHtml(run.client.businessName)} · <span class="mono">${escapeHtml(run.id)}</span></p></div></header><section class="panel"><div class="section-heading"><span>${active ? 'LIVE' : 'DONE'}</span><div><h2>${escapeHtml(run.currentStage ?? run.status)}</h2><p>${active ? 'This page refreshes every five seconds. You may safely leave and return later.' : 'Processing has finished.'}</p></div></div><dl class="import-report"><div><dt>Discovered</dt><dd>${run.recordsDiscovered}</dd></div><div><dt>Imported</dt><dd>${run.recordsImported}</dd></div><div><dt>Updated</dt><dd>${run.recordsUpdated}</dd></div><div><dt>Duplicates</dt><dd>${run.duplicates}</dd></div><div><dt>Enriched</dt><dd>${run.enriched}</dd></div><div><dt>Scored</dt><dd>${run.scored}</dd></div><div><dt>Hot leads</dt><dd>${run.hotLeads}</dd></div><div><dt>Queued</dt><dd>${state?.queuedForReview ?? 0}</dd></div></dl>${errors.length ? `<div class="notice error"><strong>Errors</strong><ul>${errors.map((item) => `<li>${escapeHtml(typeof item === 'object' && item && 'message' in item ? String(item.message) : String(item))}</li>`).join('')}</ul></div>` : ''}<div class="form-actions"><a class="button" href="/admin/leads?sort=score">View ranked leads</a>${active ? '<a class="button secondary" href="">Refresh now</a>' : ''}</div></section>`,
+        `<nav class="admin-tabs"><a href="/admin">Clients</a><a class="active" href="/admin/leads">Lead Intelligence</a><a href="/admin/call-queue">Call queue</a></nav><header class="page-header"><div><a class="eyebrow" href="/admin/leads/search">← New search</a><h1>${active ? 'Pipeline is running' : `Pipeline ${escapeHtml(run.status)}`}</h1><p>${escapeHtml(run.client.businessName)} · <span class="mono">${escapeHtml(run.id)}</span></p></div></header><section class="panel"><div class="section-heading"><span>${active ? 'LIVE' : 'DONE'}</span><div><h2>${escapeHtml(run.currentStage ?? run.status)}</h2><p>${active ? 'This page refreshes every five seconds. You may safely leave and return later.' : 'Processing has finished.'}</p></div></div><dl class="import-report"><div><dt>Discovered</dt><dd>${run.recordsDiscovered}</dd></div><div><dt>Imported</dt><dd>${run.recordsImported}</dd></div><div><dt>Updated</dt><dd>${run.recordsUpdated}</dd></div><div><dt>Duplicates</dt><dd>${run.duplicates}</dd></div><div><dt>Enriched</dt><dd>${run.enriched}</dd></div><div><dt>Scored</dt><dd>${run.scored}</dd></div><div><dt>Hot leads</dt><dd>${run.hotLeads}</dd></div><div><dt>Queued</dt><dd>${state?.queuedForReview ?? 0}</dd></div></dl>${errors.length ? `<div class="notice error"><strong>Errors</strong><ul>${errors.map((item) => `<li>${escapeHtml(errorSummary(item))}</li>`).join('')}</ul></div>` : ''}<div class="form-actions"><a class="button" href="/admin/leads?sort=score">View ranked leads</a>${active ? '<a class="button secondary" href="">Refresh now</a>' : ''}</div></section>`,
       ),
     );
   } catch (error) {
