@@ -447,6 +447,7 @@ model ProspectBusiness {
   sourceRecords      LeadSourceRecord[]
   websiteAudits      WebsiteAudit[]
   realEstateListings RealEstateListing[]
+  salesDemos         SalesDemo[]
 
   @@unique([clientId, googlePlaceId])
   @@unique([clientId, googleCid])
@@ -1111,4 +1112,47 @@ model OutreachActivity {
   @@unique([clientId, provider, externalId])
   @@index([clientId, leadId, occurredAt])
   @@index([clientId, channel, occurredAt])
+}
+
+enum SalesDemoStatus {
+  draft
+  published
+  archived
+}
+
+model SalesDemo {
+  id                 String          @id @default(uuid()) @db.Uuid
+  creationRequestId  String          @unique @db.Uuid
+  shareToken         String          @unique
+  businessName       String
+  prospectBusinessId String?         @db.Uuid
+  inputs             Json
+  presentation       Json
+  status             SalesDemoStatus @default(draft)
+  version            Int             @default(1)
+  eventCount         Int             @default(0)
+  reviewedAt         DateTime?
+  publishedAt        DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  prospectBusiness ProspectBusiness? @relation(fields: [prospectBusinessId], references: [id], onDelete: SetNull)
+  events           SalesDemoEvent[]
+
+  @@index([prospectBusinessId])
+  @@index([status, expiresAt])
+  @@index([updatedAt])
+}
+
+model SalesDemoEvent {
+  id         String    @id @default(uuid()) @db.Uuid
+  demoId     String    @db.Uuid
+  sessionKey String    @db.Uuid
+  kind       String
+  createdAt  DateTime  @default(now())
+  demo       SalesDemo @relation(fields: [demoId], references: [id], onDelete: Cascade)
+
+  @@unique([demoId, sessionKey, kind])
+  @@index([demoId, createdAt])
 }

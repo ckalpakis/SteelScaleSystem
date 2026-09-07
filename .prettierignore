@@ -2,3 +2,4 @@ dist
 node_modules
 src/generated
 package-lock.json
+steel-scale-demo-builder

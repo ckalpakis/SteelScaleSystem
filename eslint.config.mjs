@@ -3,7 +3,16 @@ import prettierConfig from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/', 'public/', 'src/generated/', 'eslint.config.mjs'] },
+  {
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'public/',
+      'src/generated/',
+      'steel-scale-demo-builder/',
+      'eslint.config.mjs',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   prettierConfig,

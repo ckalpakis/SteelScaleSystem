@@ -1,0 +1,34 @@
+{
+  "package": "Steel Scale on-demand Demo Builder",
+  "prepared": "2026-09-07",
+  "repository": "ckalpakis/SteelScaleSystem",
+  "baseline_commit": "e9ff23049fa34db1977b295ea2eb3d0f61bc45a5",
+  "status": "source package only; not committed or deployed",
+  "unit_tests": {
+    "passed": 51,
+    "failed": 0
+  },
+  "full_repository_typecheck": "not run",
+  "database_tests": "not run",
+  "browser_tests": "blocked by environment",
+  "files": {
+    "CODEX_IMPLEMENTATION_PROMPT.md": "952b842bd29f4ee168433ce2f902ef4a989464ee88c990c8cc43561fc485a015",
+    "PREVIEW.html": "923670f68bb01188dfa7a144413f4db4769763461440dd27126c513db653984e",
+    "README.md": "3530f6cf55f6061a6fbd77a130a9ccc05e6151989e57e4d5ce1d62a6f6d57fac",
+    "apply_to_repo.py": "34f4eab72497360a6434b20224a7e69cef2209587554f3f9f51b7a5e7701bfd1",
+    "overlay/docs/DEMO_ENGINE_ROLLOUT.md": "65661ec05420dd41ca30daee4aa47bae200b0feeb7d0a20a5352b9906667d782",
+    "overlay/docs/STEEL_SCALE_BUSINESS_OPERATING_MODEL.md": "d22dec1e9e6d78f482f211f4ccb246c28c3c898905f2a512957056884a396262",
+    "overlay/docs/STEEL_SCALE_DEMO_ENGINE.md": "c8d1a1cb41a74e38de2fd0bf69919f31931f2f5722f09996027648eb06115a28",
+    "overlay/src/demo-engine/core.test.ts": "9bfabce6332f18d7fbbccdde1a26f9a7f89b181a9b75731b4fbf2d72e53833c0",
+    "overlay/src/demo-engine/core.ts": "23d0fdc47d9367926922b1ab92c54573a8fe2dd591a77a234167248103ec26dd",
+    "overlay/src/demo-engine/routes.ts": "9f85f203f267e411f7f3619bb5d48fe87088f826d21ee7f1cdec6e34cc606fa6",
+    "overlay/src/demo-engine/security.ts": "241518752886d221c92b7e430cc4bcc0b49062f7c94ca4dd5b81c18672c7c076",
+    "overlay/src/demo-engine/views.ts": "8df0f91691c013f0e74cea322a8948df220275d5c36911bc170d0969a3fb3c43",
+    "overlay/src/demo-engine/website.ts": "70228e26442cdee57b409ef9938186e3dec42ecd0f3b3b4d8b6f9bb6fb4e6af5",
+    "schema/demo-models.prisma": "398f4cad2998709cc4fb2254c660e7b9a1af474c59ade65bc5af59831f9af6d1",
+    "schema/migration.sql": "aaf3c0b042b3ce27f58b2d54f8ebd5cad873bb93f5579f09d2391d06c9ca62c2",
+    "tests/browser-results.txt": "4508b3295e48084477e5e0217b12b610321d6d660eba2a355ac106fc90e956dd",
+    "tests/browser_check.py": "7018594ad3aa3a04b9ceddde03b6dc37b4449d1c95da93ad8b3b2f56ad2ab6ef",
+    "tests/unit-results.txt": "ec758b808ade9105a31bb8fd35d2139f380f532362eb63db248b9be0dd83b395"
+  }
+}

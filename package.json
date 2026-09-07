@@ -39,7 +39,9 @@
     "test:lead-intelligence-phase-11": "tsx scripts/test-lead-intelligence-phase-11.ts",
     "test:lead-intelligence-analyst": "tsx scripts/test-lead-intelligence-analyst.ts",
     "test:lead-discovery-providers": "tsx scripts/test-lead-discovery-providers.ts",
-    "test:ghl-availability": "tsx scripts/test-ghl-availability.ts"
+    "test:ghl-availability": "tsx scripts/test-ghl-availability.ts",
+    "test:demos": "tsx --test src/demo-engine/core.test.ts",
+    "test:demos:integration": "tsx --test src/demo-engine/routes.integration.test.ts"
   },
   "engines": {
     "node": ">=20"

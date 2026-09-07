@@ -24,6 +24,6 @@ export function adminLayout(title: string, content: string): string {
     .offer-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px}.offer-picker label{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--line);border-radius:6px}.offer-picker input{width:auto;margin:0}.export-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.export-card{display:flex;align-items:center;justify-content:space-between;padding:18px;margin:0}.export-card>div{display:grid;gap:4px}.export-card strong{font:800 32px ui-monospace,SFMono-Regular,monospace}.export-card small{color:var(--steel)}
   </style>
 </head>
-<body><header class="topbar"><div><a class="brand" href="/admin">Steel Scale · Operations</a><span class="utility">internal admin</span></div></header><main>${content}</main></body>
+<body><header class="topbar"><div><a class="brand" href="/admin">Steel Scale · Operations</a><nav><a href="/admin/demos">Sales demos</a> · <span class="utility">internal admin</span></nav></div></header><main>${content}</main></body>
 </html>`;
 }
