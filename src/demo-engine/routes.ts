@@ -22,6 +22,9 @@ import {
 import { researchHomepage } from './website.js';
 import { signForm, verifyForm } from './security.js';
 import { formView, layout, publicView } from './views.js';
+import path from 'node:path';
+import { liveRouter, runtimeToken } from './live-routes.js';
+import { liveReadiness } from './live-runtime.js';
 
 export const demoAdminRouter = Router();
 export const demoPublicRouter = Router();
@@ -34,8 +37,8 @@ for (const router of [demoAdminRouter, demoPublicRouter]) {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Content-Security-Policy':
-        "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+        "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; media-src 'self' blob:; img-src 'self' data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()',
     });
     if (process.env.DEMO_ENGINE_ENABLED !== 'true') {
       res.status(404).send('Not found.');
@@ -47,6 +50,15 @@ for (const router of [demoAdminRouter, demoPublicRouter]) {
 // This router authenticates itself. Do not rely on parent /admin routing order.
 demoAdminRouter.use(requireAdminAuth);
 demoAdminRouter.use(express.urlencoded({ extended: false, limit: '32kb', parameterLimit: 60 }));
+demoAdminRouter.use('/:id/live', liveRouter(true));
+demoPublicRouter.use('/:token/live', liveRouter(false));
+demoPublicRouter.get('/assets/:file', (req, res) => {
+  if (!['experience.css', 'experience.js'].includes(String(req.params.file))) {
+    res.sendStatus(404);
+    return;
+  }
+  res.sendFile(path.resolve('public/demo', String(req.params.file)));
+});
 demoPublicRouter.use(express.json({ limit: '2kb' }));
 function formToken(req: Request, scope: string): string {
   return signForm(env.ADMIN_PASSWORD ?? '', req.header('authorization') ?? '', scope);
@@ -248,13 +260,19 @@ demoAdminRouter.post('/:id/edit', async (req, res) => {
 demoAdminRouter.get('/:id/preview', async (req, res) => {
   const demo = await db.salesDemo.findUnique({
     where: { id: idParam(req) },
-    select: { presentation: true },
+    select: { id: true, version: true, presentation: true },
   });
   if (!demo) {
     res.status(404).send('Demo not found.');
     return;
   }
-  res.type('html').send(publicView(demo.presentation as unknown as Presentation, '', true));
+  res.type('html').send(
+    publicView(demo.presentation as unknown as Presentation, '', true, {
+      base: `/admin/demos/${demo.id}/live`,
+      csrf: runtimeToken(req, demo.id, demo.version, true),
+      ...liveReadiness(),
+    }),
+  );
 });
 demoAdminRouter.get('/:id', async (req, res) => {
   const id = idParam(req);
@@ -277,7 +295,7 @@ demoAdminRouter.get('/:id', async (req, res) => {
     .send(
       layout(
         demo.businessName,
-        `<h1>${e(demo.businessName)}</h1><p>Status: <strong>${demo.status === 'published' && !canView(demo.status, demo.expiresAt) ? 'expired' : e(demo.status)}</strong> · Version ${demo.version} · ${demo.prospectBusinessId ? 'Linked prospect' : 'Standalone demo'}</p><div class="actions"><a class="button" href="/admin/demos/${id}/preview">Preview privately</a><a href="/admin/demos/${id}/edit">Edit / regenerate</a></div><section><h2>Review before sharing</h2><p>Modules: ${p.modules.map((m) => e(MODULES[m])).join(', ')}</p><p>Homepage research: ${e(p.websiteEvidence.status)}. ${e(p.websiteEvidence.warning)}</p><p>Only explicit public fields are rendered. Private sales notes and the business phone remain in the admin record. Niche examples must not be presented as verified services.</p><p>The current modules are simulations; live Vapi voice, AI chat, review automation, and client onboarding are not implemented here.</p></section><section><h2>Publish / renew</h2><form method="post" action="/admin/demos/${id}/publish">${actionFields('publish')}<label>Link lifetime (days, 1–90)<input name="days" type="number" min="1" max="90" value="45" required></label><label class="check"><input type="checkbox" name="reviewed" required>I reviewed this preview, its business information, and all example assumptions.</label><button>Publish reviewed demo</button></form>${canView(demo.status, demo.expiresAt) ? `<p>Shareable link: <a href="${path}" rel="noreferrer">${path}</a></p><p>Anyone with this link can view the demo until ${e(demo.expiresAt?.toISOString())}. Opening the public link may count as engagement; use the private preview when testing.</p>` : '<p>No active public link. Draft, archived, and expired demos return 404.</p>'}</section><section><h2>Engagement — all versions combined</h2>${counts.map((row) => `<p>${e(row.kind)}: ${row._count._all}</p>`).join('') || '<p>No recorded interactions.</p>'}<p>These are deduplicated browser-session signals, not identified owners, confirmed human visits, or proof of purchase intent. Preview visits are excluded; returning tabs or link scanners can still affect counts.</p></section><section><h2>Archive demo</h2><p>Stops public access immediately. Keeps the record and any linked prospect. No live client is affected.</p><form method="post" action="/admin/demos/${id}/archive">${actionFields('archive')}<button class="secondary">Archive</button></form></section>`,
+        `<h1>${e(demo.businessName)}</h1><p>Status: <strong>${demo.status === 'published' && !canView(demo.status, demo.expiresAt) ? 'expired' : e(demo.status)}</strong> · Version ${demo.version} · ${demo.prospectBusinessId ? 'Linked prospect' : 'Standalone demo'}</p><div class="actions"><a class="button" href="/admin/demos/${id}/preview">Preview privately</a><a href="/admin/demos/${id}/edit">Edit / regenerate</a></div><section><h2>Review before sharing</h2><p>Modules: ${p.modules.map((m) => e(MODULES[m])).join(', ')}</p><p>Homepage research: ${e(p.websiteEvidence.status)}. ${e(p.websiteEvidence.warning)}</p><p>Only explicit public fields are rendered. Private sales notes and the business phone remain in the admin record. Niche examples must not be presented as verified services.</p><p>Voice and website chat support real OpenAI conversations when enabled. Appointments, missed-call messages, and follow-ups stay simulated. No real business phone numbers or production booking tools are used.</p><p>Live chat: ${liveReadiness().chat ? 'configured' : 'awaiting setup'}. Browser voice: ${liveReadiness().voice ? 'configured' : 'awaiting setup'}. These indicators check flags and key presence, not provider connectivity. Set DEMO_AI_ENABLED and DEMO_VOICE_ENABLED with a working OpenAI key in your local/staging environment; see docs/LIVE_DEMO_EXPERIENCE.md.</p></section><section><h2>Publish / renew</h2><form method="post" action="/admin/demos/${id}/publish">${actionFields('publish')}<label>Link lifetime (days, 1–90)<input name="days" type="number" min="1" max="90" value="45" required></label><label class="check"><input type="checkbox" name="reviewed" required>I reviewed this preview, its business information, and all example assumptions.</label><button>Publish reviewed demo</button></form>${canView(demo.status, demo.expiresAt) ? `<p>Shareable link: <a href="${path}" rel="noreferrer">${path}</a></p><p>Anyone with this link can view the demo until ${e(demo.expiresAt?.toISOString())}. Opening the public link may count as engagement; use the private preview when testing.</p>` : '<p>No active public link. Draft, archived, and expired demos return 404.</p>'}</section><section><h2>Engagement — all versions combined</h2>${counts.map((row) => `<p>${e(row.kind)}: ${row._count._all}</p>`).join('') || '<p>No recorded interactions.</p>'}<p>These are deduplicated browser-session signals, not identified owners, confirmed human visits, or proof of purchase intent. Preview visits are excluded; returning tabs or link scanners can still affect counts.</p></section><section><h2>Archive demo</h2><p>Stops public access immediately. Keeps the record and any linked prospect. No live client is affected.</p><form method="post" action="/admin/demos/${id}/archive">${actionFields('archive')}<button class="secondary">Archive</button></form></section>`,
         true,
       ),
     );
@@ -329,15 +347,19 @@ demoPublicRouter.get('/:token', async (req, res) => {
   // Select only the public allowlisted snapshot. Never return inputs, private notes or prospect relations.
   const demo = await db.salesDemo.findUnique({
     where: { shareToken: token },
-    select: { status: true, expiresAt: true, presentation: true },
+    select: { id: true, version: true, status: true, expiresAt: true, presentation: true },
   });
   if (!demo || !canView(demo.status, demo.expiresAt)) {
     res.status(404).send('Demo not available.');
     return;
   }
-  res
-    .type('html')
-    .send(publicView(demo.presentation as unknown as Presentation, `/demo/${token}/events`, false));
+  res.type('html').send(
+    publicView(demo.presentation as unknown as Presentation, `/demo/${token}/events`, false, {
+      base: `/demo/${token}/live`,
+      csrf: runtimeToken(req, demo.id, demo.version, false),
+      ...liveReadiness(),
+    }),
+  );
 });
 demoPublicRouter.post('/:token/events', async (req, res) => {
   const token = req.params.token;
@@ -447,5 +469,10 @@ const handleError: ErrorRequestHandler = (err: unknown, _req, res, _next) => {
     .status(500)
     .send('Demo request failed. Check the feature configuration and database migration.');
 };
-demoAdminRouter.use(handleError);
-demoPublicRouter.use(handleError);
+for (const router of [demoAdminRouter, demoPublicRouter]) {
+  // Unknown demo paths must not fall through to the generic bearer-URL/header logger.
+  router.use((_req, res) => {
+    res.status(404).send('Demo route not found.');
+  });
+  router.use(handleError);
+}

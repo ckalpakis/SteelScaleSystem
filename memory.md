@@ -60,3 +60,18 @@ Live browser voice, live AI chat, review automation, verified GBP enrichment, sc
 integration and the client portal are separate milestones, not completed features.
 See docs/STEEL_SCALE_DEMO_ENGINE.md and docs/DEMO_ENGINE_ROLLOUT.md. Keep
 DEMO_ENGINE_ENABLED=false until migration, application integration and staging tests pass.
+
+## Interactive sales experience milestone (2026-09-07)
+
+The user explicitly prioritizes showing a customer-like, interactive experience during sales
+calls. The demo now has a personalized website with a working AI-chat widget and a browser
+voice receptionist runtime (OpenAI Realtime), with separate SalesDemoSession persistence.
+Reuse the safe shared OpenAI response parser, never the production booking tools. Voice and
+chat require explicit DEMO_AI_ENABLED / DEMO_VOICE_ENABLED configuration and operator
+interaction. All three demo flags remain false in committed defaults. Appointment cards and
+messaging examples remain simulations; no production Client or booking is created.
+
+Automated tests use stubbed provider responses and isolated local databases; real paid audio
+acceptance must not be claimed without an actual authorized test. Exact production Vapi-agent
+parity, current-website cloning, stronger niche packs, GBP/reviews, onboarding and portals are
+not completed by this milestone. See docs/LIVE_DEMO_EXPERIENCE.md and its verification report.

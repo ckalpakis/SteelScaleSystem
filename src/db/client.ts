@@ -10,9 +10,25 @@ export const db = new PrismaClient({
 });
 
 db.$on('error', (event) => {
-  logger.error({ prisma: event }, 'Database error');
+  // Prisma validation errors can include entire JSON inputs and conversation history.
+  // Demo data must not reach logs even when a query fails.
+  const safe = /salesdemo/i.test(`${event.target} ${event.message}`)
+    ? {
+        target: 'sales-demo',
+        timestamp: event.timestamp,
+        message: 'Demo database operation failed (details redacted)',
+      }
+    : event;
+  logger.error({ prisma: safe }, 'Database error');
 });
 
 db.$on('warn', (event) => {
-  logger.warn({ prisma: event }, 'Database warning');
+  const safe = /salesdemo/i.test(`${event.target} ${event.message}`)
+    ? {
+        target: 'sales-demo',
+        timestamp: event.timestamp,
+        message: 'Demo database warning (details redacted)',
+      }
+    : event;
+  logger.warn({ prisma: safe }, 'Database warning');
 });

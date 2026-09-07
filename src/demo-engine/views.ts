@@ -1,4 +1,4 @@
-import { escapeHtml as e, MODULES, type DemoInput, type Presentation } from './core.js';
+import { escapeHtml as e, MODULES, type DemoInput } from './core.js';
 
 const styles = `:root{color-scheme:dark;--bg:#101216;--card:#1b1f26;--line:#363c48;--ink:#f4f5f7;--muted:#adb7c8;--yellow:#f5c518}*{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif;margin:0}header,main,footer{width:min(1080px,calc(100% - 40px));margin:auto}header{padding:28px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}main{padding:42px 0}footer{padding:30px 0;color:var(--muted);font-size:13px}.brand{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow);font-weight:800}h1{font-size:clamp(30px,5vw,52px);line-height:1.1;letter-spacing:-.03em}h2{font-size:22px;margin-top:0}p,small{color:var(--muted)}a{color:var(--yellow)}a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--yellow);outline-offset:4px}button,.button{display:inline-block;font:700 15px system-ui;border:0;border-radius:7px;background:var(--yellow);color:#121416;padding:12px 18px;cursor:pointer;text-decoration:none}button:disabled{opacity:.5;cursor:default}.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}section,.card{margin:22px 0;padding:26px;border:1px solid var(--line);border-radius:12px;background:var(--card)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.wide{grid-column:1/-1}label{display:block;font-size:14px;font-weight:600}input,textarea,select{display:block;width:100%;padding:11px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;margin:7px 0 16px}textarea{min-height:110px;resize:vertical}input[type=checkbox]{display:inline-block;width:auto;margin:0 9px 0 0}.check{margin:12px 0}.notice{padding:15px 18px;background:#29281d;border-left:4px solid var(--yellow);color:var(--ink);font-size:14px}.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}table{border-collapse:collapse;width:100%;font-size:14px}td,th{text-align:left;border-bottom:1px solid var(--line);padding:12px}th{color:var(--muted)}.table-wrap{overflow:auto}.pill{display:inline-block;padding:4px 10px;font-size:12px;border-radius:20px;background:#303745;margin:4px}.messages{white-space:pre-wrap;min-height:90px;margin:18px 0;padding:18px;border-radius:8px;background:var(--bg)}.stat{font-size:27px;color:var(--yellow);font-weight:800}.error{border-left-color:#ff8989}code{overflow-wrap:anywhere}@media(max-width:680px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}section{padding:18px}header,main,footer{width:calc(100% - 28px)}}`;
 export function layout(title: string, body: string, admin = false, script = ''): string {
@@ -30,94 +30,10 @@ export function formView(
       )
       .join(
         '',
-      )}<p>This first release generates guided simulations and website observations. It does not provision live voice agents or run AI conversations.</p></section>
+      )}<p>Voice and chat support live AI conversations when enabled by the operator. Appointment bookings and messaging examples remain simulated.</p></section>
     <div class="notice">${version ? 'Saving regenerates the draft and unpublishes the previous version until you review and publish again.' : 'Generation creates a private draft only. Nothing is sent to the prospect.'}</div><p><button>Generate draft</button> <a href="/admin/demos">Cancel</a></p></form>`,
     true,
   );
 }
-export function publicView(p: Presentation, endpoint: string, preview: boolean): string {
-  const service = p.services[0] ?? 'a consultation';
-  const moduleHtml = p.modules
-    .map((key) => {
-      if (key === 'audit')
-        return `<section data-module="audit"><h2>${MODULES.audit}</h2><p>Status: ${e(p.websiteEvidence.status)}${p.websiteEvidence.checkedAt ? ` · Checked ${e(p.websiteEvidence.checkedAt)}` : ''}</p><p>${e(p.websiteEvidence.title)}</p>${p.websiteEvidence.observations.map((line) => `<p>${e(line)}</p>`).join('')}<div class="notice">${e(p.websiteEvidence.warning)}</div>${p.websiteEvidence.sourceUrl ? `<p>Source: <a rel="noreferrer noopener" href="${e(p.websiteEvidence.sourceUrl)}">Business homepage</a></p>` : ''}<button class="secondary" data-event="audit_viewed">Mark this section as reviewed</button></section>`;
-      if (key === 'roi')
-        return `<section data-module="roi"><h2>${MODULES.roi}</h2><p>Editable hypothetical assumptions — not measured business performance or a guarantee.</p><div class="grid">${[
-          ['Missed calls / month', 20],
-          ['Recoverable share (%)', 50],
-          ['Qualified / bookable share (%)', 50],
-          ['Close rate (%)', 50],
-          ['Average collected job value ($)', 1000],
-          ['Contribution margin (%)', 40],
-          ['Monthly fee ($)', 500],
-        ]
-          .map(
-            ([label, value], i) =>
-              `<label>${label}<input data-roi="${i}" type="number" min="0" max="${[1, 2, 3, 5].includes(i) ? '100' : i === 0 ? '100000' : '10000000'}" step="any" value="${value}"></label>`,
-          )
-          .join(
-            '',
-          )}</div><button id="calculate">Calculate scenario</button><div id="roi-result" class="messages" aria-live="polite">Revenue and contribution are calculated separately. No result has been calculated yet.</div></section>`;
-      const previews: Record<string, string[]> = {
-        voice: [
-          `AI receptionist: Thanks for contacting ${p.businessName}. This is a sample conversation, not a live call.`,
-          `Caller: I would like help with ${service}.`,
-          `AI receptionist: I can collect the service need and a preferred time, then request availability.`,
-          'Sandbox: sample booking request recorded for illustration only. Nothing has been placed on a real calendar.',
-        ],
-        chatbot: [
-          `Assistant: Welcome to the ${p.businessName} sample chat experience.`,
-          `Visitor: Can you help me arrange ${service}?`,
-          'Assistant: In a live implementation I would check configured availability before asking you to confirm.',
-          'Sandbox: sample request complete. No real appointment was booked.',
-        ],
-        missed_call: [
-          '00:00 — Example incoming call is missed.',
-          `00:08 — Simulated text: Thanks for reaching out to ${p.businessName}. How can we help?`,
-          `00:25 — Sample customer: I am interested in ${service}.`,
-          '00:40 — Simulated reply: We can collect your preferences and request a suitable time. No SMS or real booking was sent.',
-        ],
-        nurture: [
-          'New opt-in lead submitted a service inquiry — fictional example.',
-          `Immediately — Example message: Thanks for your interest in ${p.businessName}. What would you like help with?`,
-          'Later — A follow-up is scheduled only while consent remains valid and the lead has not replied or booked.',
-          'Next day — Follow-up stops on reply, booking, handoff, or opt-out. This timeline is fast-forwarded; no real message was sent.',
-        ],
-      };
-      const steps = previews[key] ?? [];
-      const event = {
-        voice: 'voice_previewed',
-        chatbot: 'chatbot_tested',
-        missed_call: 'missed_call_tested',
-        nurture: 'nurture_tested',
-      }[key];
-      return `<section data-module="${key}"><h2>${MODULES[key]}</h2><p>Guided simulation — no live AI/provider connection in this release.</p><div class="messages" aria-live="polite">Press “Run sample” to explore this workflow.</div><ol hidden>${steps.map((step) => `<li>${e(step)}</li>`).join('')}</ol><button data-run="${key}" data-event="${e(event)}">Run sample</button> <button class="secondary" data-reset="${key}">Reset</button></section>`;
-    })
-    .join('');
-  const body = `<div id="demo" data-events="${e(preview ? '' : endpoint)}"></div>${preview ? '<div class="notice">PRIVATE ADMIN PREVIEW — engagement tracking is disabled. Publish only after verifying facts.</div>' : ''}<h1>A sample automation system<br>for ${e(p.businessName)}</h1><p>${e(p.niche)}${p.location ? ` · ${e(p.location)}` : ''}</p><p>${e(p.summary)}</p><div class="notice">${e(p.disclosure)}</div><section><h2>Demo business context</h2><p>${p.services.map((s) => `<span class="pill">${e(s)}</span>`).join('')}</p><p>Services: ${p.servicesSource === 'operator' ? 'entered by the operator; not independently verified' : 'illustrative niche examples, not confirmed offerings'}. ${p.hours ? `Operator-provided hours: ${e(p.hours)}` : 'Business hours have not been verified.'}</p>${p.googleBusinessProfileUrl ? `<p><a href="${e(p.googleBusinessProfileUrl)}" rel="noreferrer noopener">Google Business Profile reference</a> — profile data was not retrieved.</p>` : ''}</section>${moduleHtml}<p>For a live implementation, speak with Carson at Steel Scale Systems. This demo cannot contact the business or book a consultation.</p><p><small>Privacy: this page records pseudonymous opens and module interactions for Steel Scale. It does not record typed conversations, personal information, or your identity. Browser storage may be used to avoid counting repeated interactions.</small></p>`;
-  return layout(p.businessName, body, false, PUBLIC_SCRIPT);
-}
-const PUBLIC_SCRIPT = `(() => {
-  const endpoint = document.getElementById('demo').dataset.events;
-  let session = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : ''; 
-  try { const key = 'steel-demo:' + endpoint; session = sessionStorage.getItem(key) || session; if(endpoint) sessionStorage.setItem(key, session); } catch {}
-  const fired = new Set();
-  const track = (kind) => { if(!endpoint || !session || fired.has(kind)) return; fired.add(kind); fetch(endpoint, {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionKey:session,kind}),credentials:'omit'}).catch(() => {}); };
-  const opened = () => { if(document.visibilityState === 'visible') track('opened'); };
-  document.addEventListener('visibilitychange', opened); opened();
-  document.querySelectorAll('[data-event]').forEach(button => button.addEventListener('click', () => track(button.dataset.event)));
-  document.querySelectorAll('[data-run]').forEach(button => button.addEventListener('click', () => { const panel = button.closest('section'); const lines = Array.from(panel.querySelectorAll('li')).map(li => li.textContent); panel.querySelector('.messages').textContent = lines.join('\\n\\n'); }));
-  document.querySelectorAll('[data-reset]').forEach(button => button.addEventListener('click', () => {button.closest('section').querySelector('.messages').textContent = 'Press “Run sample” to explore this workflow.';}));
-  document.getElementById('calculate')?.addEventListener('click', () => {
-    const inputs = Array.from(document.querySelectorAll('[data-roi]'));
-    const values = inputs.map(input => Number(input.value));
-    const output = document.getElementById('roi-result');
-    if(inputs.some(input => input.value.trim() === '' || !input.checkValidity()) || values.some(n => !Number.isFinite(n) || n < 0)) {output.textContent = 'Enter valid nonnegative values. Percentages must be 0–100.'; return;}
-    const [missed,recovery,qualification,close,job,margin,fee] = values;
-    const revenue = missed * recovery/100 * qualification/100 * close/100 * job;
-    const contribution = revenue * margin/100 - fee;
-    const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
-    output.textContent = 'Potential recovered revenue: ' + money(revenue) + '/month\\nContribution after monthly fee: ' + money(contribution) + '/month\\nFormula: missed calls × recoverable share × qualified/bookable share × close rate × average collected job value. These are assumptions, not a forecast.';
-    track('roi_used');
-  });
-})();`;
+
+export { publicView } from './experience-view.js';
