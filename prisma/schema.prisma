@@ -1137,8 +1137,9 @@ model SalesDemo {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  prospectBusiness ProspectBusiness? @relation(fields: [prospectBusinessId], references: [id], onDelete: SetNull)
+  prospectBusiness ProspectBusiness?  @relation(fields: [prospectBusinessId], references: [id], onDelete: SetNull)
   events           SalesDemoEvent[]
+  sessions         SalesDemoSession[]
 
   @@index([prospectBusinessId])
   @@index([status, expiresAt])
@@ -1155,4 +1156,26 @@ model SalesDemoEvent {
 
   @@unique([demoId, sessionKey, kind])
   @@index([demoId, createdAt])
+}
+
+model SalesDemoSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  demoId         String    @db.Uuid
+  demoVersion    Int
+  tokenHash      String    @unique
+  channel        String
+  preview        Boolean   @default(false)
+  expiresAt      DateTime
+  endedAt        DateTime?
+  busyUntil      DateTime?
+  turns          Int       @default(0)
+  messages       Json      @default("[]")
+  booking        Json?
+  providerCallId String?   @unique
+  createdAt      DateTime  @default(now())
+  demo           SalesDemo @relation(fields: [demoId], references: [id], onDelete: Cascade)
+
+  @@index([demoId, createdAt])
+  @@index([channel, endedAt, expiresAt])
+  @@index([createdAt])
 }

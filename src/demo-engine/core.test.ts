@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-floating-promises -- node:test registrations are intentionally top-level. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   parseInput,
   recommendModules,
@@ -143,7 +144,12 @@ test('preview has no analytics endpoint', () => {
 });
 test('public demo sends only pseudonymous allowlisted interactions', () => {
   const html = publicView(generatePresentation(parseInput(raw)), '/demo/test/events', false);
-  assert.ok(html.includes('sessionKey:session,kind'));
+  assert.ok(html.includes('/demo/assets/experience.js'));
+  const script = readFileSync('public/demo/experience.js', 'utf8');
+  assert.match(script, /sessionKey: eventSession, kind/);
+  assert.ok(!script.includes('innerHTML'));
+  assert.ok(!script.includes('/internal/bookings'));
+  assert.ok(!script.includes('/chatbot'));
   assert.ok(!html.includes('innerHTML'));
   assert.ok(!html.includes('/internal/bookings'));
   assert.ok(!html.includes('/chatbot'));

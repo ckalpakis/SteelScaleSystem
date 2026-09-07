@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { responseText } from './openai-response.js';
 
 import { env } from '../config/env.js';
 import type { BookingToolInput, ChatTurn, LlmReply } from '../types/chatbot.js';
@@ -119,8 +120,9 @@ async function callOpenAi(
       },
     };
   }
-  if (typeof response.output_text !== 'string') throw new Error('OpenAI returned no text');
-  return { text: response.output_text };
+  const text = responseText(response);
+  if (!text) throw new Error('OpenAI returned no text');
+  return { text };
 }
 
 async function callAnthropic(

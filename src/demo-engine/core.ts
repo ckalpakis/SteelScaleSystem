@@ -1,7 +1,7 @@
 /** On-demand sales demonstrations. This module has no production integration dependencies. */
 export const MODULES = {
-  voice: 'Receptionist conversation preview',
-  chatbot: 'Website chat simulation',
+  voice: 'Live AI voice receptionist',
+  chatbot: 'Interactive AI website chat',
   missed_call: 'Missed-call recovery simulation',
   nurture: 'Lead nurture simulation',
   audit: 'Homepage observations',

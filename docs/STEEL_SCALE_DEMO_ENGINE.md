@@ -1,5 +1,7 @@
 # Steel Scale Systems — on-demand sales demo engine
 
+> September 7, 2026 implementation update: the original package/spec below is retained for context. The integrated application now includes an interactive website/chat presentation and a demo-only OpenAI browser-voice/chat runtime. See [LIVE_DEMO_EXPERIENCE.md](LIVE_DEMO_EXPERIENCE.md) for current functionality, simulated boundaries, configuration and remaining validation. The old “text-only simulation” rows below describe the initial milestone, not the current UI.
+
 **Approved direction:** September 7, 2026. **Owner:** Carson Kalpakis / Steel Scale Systems.
 **Repository:** `ckalpakis/SteelScaleSystem`.
 **Inspected baseline:** `e9ff23049fa34db1977b295ea2eb3d0f61bc45a5`.

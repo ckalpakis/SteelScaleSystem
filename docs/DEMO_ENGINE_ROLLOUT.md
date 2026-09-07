@@ -1,5 +1,7 @@
 # Demo engine — integration and rollout
 
+> Current implementation and validation have moved beyond this original package-authoring checklist. See [LIVE_DEMO_EXPERIENCE.md](LIVE_DEMO_EXPERIENCE.md) and [LIVE_DEMO_VERIFICATION.md](LIVE_DEMO_VERIFICATION.md) for the integrated live-demo runtime, exact local steps and actual test results. Historical statements below about unavailable repository/browser integration apply to package preparation, not the current implementation.
+
 ## Current status
 
 Source package only. No GitHub commit, pull request, database migration, live configuration change or deployment has happened. The active GitHub integration rejected branch creation with HTTP 403. Full repository cloning/dependency installation were unavailable in the authoring environment, and its browser denied both local-file and local-HTTP navigation. Do not report full application or browser tests as passed.

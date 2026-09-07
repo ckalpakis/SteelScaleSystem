@@ -4,6 +4,9 @@ import { after, before, test } from 'node:test';
 import { once } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { requireDemoTestDatabase } from './test-database.js';
+
+requireDemoTestDatabase();
 
 process.env.ADMIN_USERNAME = 'demo-integration-admin';
 process.env.ADMIN_PASSWORD = 'demo-integration-password';
