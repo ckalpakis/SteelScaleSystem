@@ -7,7 +7,11 @@ export function escapeHtml(value: string | number | null | undefined): string {
     .replaceAll("'", '&#039;');
 }
 
-export function adminLayout(title: string, content: string): string {
+export function workspaceLayout(title: string, content: string): string {
+  return adminLayout(title, content, true);
+}
+
+export function adminLayout(title: string, content: string, workspace = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -23,7 +27,8 @@ export function adminLayout(title: string, content: string): string {
     @media(max-width:1200px){.next-call{grid-template-columns:75px 1fr 1fr}.call-capture{grid-column:2/-1;border-top:1px solid var(--line)}}@media(max-width:1050px){.metric-strip{grid-template-columns:repeat(4,1fr)}.filter-grid{grid-template-columns:repeat(3,1fr)}.conversion-grid{grid-template-columns:1fr}}@media(max-width:760px){.form-grid,.detail-grid{grid-template-columns:1fr}.wide{grid-column:auto}.page-header,.detail-header{align-items:flex-start;flex-direction:column}.metric-strip,.call-metrics{grid-template-columns:repeat(2,1fr)}.filter-grid{grid-template-columns:repeat(2,1fr)}.signal-grid{grid-template-columns:1fr}.signal-grid>div{border-right:0}.property-trigger,.next-call{grid-template-columns:1fr}.next-call>div{border-right:0;border-bottom:1px solid var(--line)}.call-rank{align-items:flex-start}.call-capture{grid-column:auto}.property-trigger img,.property-placeholder{height:210px}th,td{min-width:120px}}@media(max-width:480px){.filter-grid{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr 1fr}.topbar>div,main{width:min(100% - 20px,1480px)}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
     .offer-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px}.offer-picker label{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--line);border-radius:6px}.offer-picker input{width:auto;margin:0}.export-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.export-card{display:flex;align-items:center;justify-content:space-between;padding:18px;margin:0}.export-card>div{display:grid;gap:4px}.export-card strong{font:800 32px ui-monospace,SFMono-Regular,monospace}.export-card small{color:var(--steel)}
   </style>
+${workspace ? '<style>.topbar>div{gap:16px;flex-wrap:wrap;padding:14px 0}.topbar nav{line-height:1.9;overflow-wrap:anywhere}.admin-tabs{overflow-x:auto}.admin-tabs a{white-space:nowrap}.crm-context a{margin-left:8px}@media(max-width:760px){.crm-context a{display:block;margin:6px 0 0}}textarea:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}</style>' : ''}
 </head>
-<body><header class="topbar"><div><a class="brand" href="/admin">Steel Scale · Operations</a><nav><a href="/admin/demos">Sales demos</a> · <span class="utility">internal admin</span></nav></div></header><main>${content}</main></body>
+<body><header class="topbar"><div><a class="brand" href="${workspace ? '/workspace' : '/admin'}">Steel Scale · ${workspace ? 'Workspace' : 'Operations'}</a><nav aria-label="Main navigation">${workspace ? '<a href="/workspace">Today</a> · ' : ''}${process.env.BUSINESS_KNOWLEDGE_ENABLED === 'true' && process.env.WORKFORCE_ENABLED === 'true' ? '<a href="/business-knowledge">Business Knowledge</a> · ' : ''}${process.env.REVENUE_RECOVERY_ENABLED === 'true' && process.env.AGENT_RUNTIME_ENABLED === 'true' && process.env.WORKFORCE_ENABLED === 'true' ? '<a href="/revenue-recovery">Revenue Recovery</a> · ' : ''}${process.env.AGENT_BUILDER_ENABLED === 'true' && process.env.AGENT_RUNTIME_ENABLED === 'true' && process.env.WORKFORCE_ENABLED === 'true' ? '<a href="/agent-builder">Agent Builder</a> · ' : ''}${process.env.WORKFORCE_ENABLED === 'true' ? `<a href="${workspace ? '/integrations' : '/admin/integrations'}">Integrations</a> · ` : ''}${process.env.CRM_ENABLED === 'true' && process.env.WORKFORCE_ENABLED === 'true' ? `<a href="${workspace ? '/workspace/crm/contacts' : '/admin/crm'}">CRM</a>` : ''}${workspace ? '' : ' · <a href="/admin/demos">Sales demos</a> · <span class="utility">internal admin</span>'}</nav></div></header><main>${content}</main></body>
 </html>`;
 }

@@ -7,6 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Operational outbox for the legacy Client boundary. System reports have neither tenant ID;
+// customer jobs always have clientId, plus organizationId only when explicitly linked.
+model BackgroundTask {
+  id             String        @id @default(uuid()) @db.Uuid
+  kind           String
+  key            String        @unique
+  payload        Json
+  payloadHash    String
+  organizationId String?       @db.Uuid
+  clientId       String?       @db.Uuid
+  correlationId  String        @db.Uuid
+  status         String        @default("pending")
+  attempts       Int           @default(0)
+  availableAt    DateTime      @default(now())
+  leaseToken     String?       @db.Uuid
+  leasedUntil    DateTime?
+  lastErrorCode  String?
+  createdAt      DateTime      @default(now())
+  completedAt    DateTime?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  client         Client?       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@index([status, availableAt])
+  @@index([organizationId, createdAt])
+  @@index([clientId, createdAt])
+}
+
 enum DestinationType {
   zapier
   ghl_fallback
@@ -163,51 +190,1152 @@ enum ProspectCallStatus {
 }
 
 model Client {
-  id                       String   @id @default(uuid()) @db.Uuid
-  businessName             String   @map("business_name")
-  phoneNumber              String   @unique @map("phone_number")
+  backgroundTasks          BackgroundTask[]
+  id                       String           @id @default(uuid()) @db.Uuid
+  businessName             String           @map("business_name")
+  phoneNumber              String           @unique @map("phone_number")
   timezone                 String
   services                 String[]
-  missedCallSmsTemplate    String   @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
-  noBookingSmsTemplate     String   @default("Thanks for calling {business_name}. Would you like to schedule your appointment by text? Reply here and I can help. Reply STOP to opt out.") @map("no_booking_sms_template")
-  smsBookingEnabled        Boolean  @default(false) @map("sms_booking_enabled")
-  ownerNotificationNumber  String?  @map("owner_notification_number")
-  notifyBookingSms         Boolean  @default(true) @map("notify_booking_sms")
-  notifyMissedCallSms      Boolean  @default(true) @map("notify_missed_call_sms")
-  notifyUnbookedCallSms    Boolean  @default(true) @map("notify_unbooked_call_sms")
-  notifyFailedBookingSms   Boolean  @default(true) @map("notify_failed_booking_sms")
-  notifyTransferFailureSms Boolean  @default(true) @map("notify_transfer_failure_sms")
-  dailySummarySms          Boolean  @default(true) @map("daily_summary_sms")
-  createdAt                DateTime @default(now()) @map("created_at")
+  missedCallSmsTemplate    String           @default("Hey, sorry we missed your call! This is {business_name} — reply here and we'll get you booked in.") @map("missed_call_sms_template")
+  noBookingSmsTemplate     String           @default("Thanks for calling {business_name}. Would you like to schedule your appointment by text? Reply here and I can help. Reply STOP to opt out.") @map("no_booking_sms_template")
+  smsBookingEnabled        Boolean          @default(false) @map("sms_booking_enabled")
+  ownerNotificationNumber  String?          @map("owner_notification_number")
+  notifyBookingSms         Boolean          @default(true) @map("notify_booking_sms")
+  notifyMissedCallSms      Boolean          @default(true) @map("notify_missed_call_sms")
+  notifyUnbookedCallSms    Boolean          @default(true) @map("notify_unbooked_call_sms")
+  notifyFailedBookingSms   Boolean          @default(true) @map("notify_failed_booking_sms")
+  notifyTransferFailureSms Boolean          @default(true) @map("notify_transfer_failure_sms")
+  dailySummarySms          Boolean          @default(true) @map("daily_summary_sms")
+  createdAt                DateTime         @default(now()) @map("created_at")
 
-  destination          ClientDestination?
-  voiceAgentConfig     VoiceAgentConfig?
-  callLogs             CallLog[]
-  bookingAttempts      BookingAttempt[]
-  chatSessions         ChatSession[]
-  leads                Lead[]
-  prospectBusinesses   ProspectBusiness[]
-  prospectContacts     ProspectContact[]
-  leadSourceRecords    LeadSourceRecord[]
-  leadSignals          LeadSignal[]
-  ingestionRuns        IngestionRun[]
-  enrichmentRuns       EnrichmentRun[]
-  websiteAudits        WebsiteAudit[]
-  realEstateListings   RealEstateListing[]
-  realEstateAgents     RealEstateAgent[]
-  listingSourceRecords RealEstateListingSourceRecord[]
-  scoreSnapshots       ScoreSnapshot[]
-  offerRecommendations OfferRecommendation[]
-  offerSuppressions    OfferSuppression[]
-  outreachActivities   OutreachActivity[]
-  pipelineRuns         PipelineRun[]
-  deliveryCampaigns    DeliveryCampaign[]
-  deliveryRecords      DeliveryRecord[]
-  callQueueEntries     CallQueueEntry[]
-  callAttempts         CallAttempt[]
-  availabilityChecks   AvailabilityCheck[]
-  ownerNotifications   OwnerNotification[]
-  smsConversations     SmsConversation[]
+  destination           ClientDestination?
+  voiceAgentConfig      VoiceAgentConfig?
+  callLogs              CallLog[]
+  bookingAttempts       BookingAttempt[]
+  chatSessions          ChatSession[]
+  leads                 Lead[]
+  prospectBusinesses    ProspectBusiness[]
+  prospectContacts      ProspectContact[]
+  leadSourceRecords     LeadSourceRecord[]
+  leadSignals           LeadSignal[]
+  ingestionRuns         IngestionRun[]
+  enrichmentRuns        EnrichmentRun[]
+  websiteAudits         WebsiteAudit[]
+  realEstateListings    RealEstateListing[]
+  realEstateAgents      RealEstateAgent[]
+  listingSourceRecords  RealEstateListingSourceRecord[]
+  scoreSnapshots        ScoreSnapshot[]
+  offerRecommendations  OfferRecommendation[]
+  offerSuppressions     OfferSuppression[]
+  outreachActivities    OutreachActivity[]
+  pipelineRuns          PipelineRun[]
+  deliveryCampaigns     DeliveryCampaign[]
+  deliveryRecords       DeliveryRecord[]
+  callQueueEntries      CallQueueEntry[]
+  callAttempts          CallAttempt[]
+  availabilityChecks    AvailabilityCheck[]
+  ownerNotifications    OwnerNotification[]
+  smsConversations      SmsConversation[]
+  workforceOrganization Organization?
+}
+
+// Workforce is additive: legacy Client data remains authoritative for existing features.
+// Recovery lifecycle is separate from the generic execution journal and legacy recovery.
+model RecoveryProgram {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @unique @db.Uuid
+  agentId          String              @db.Uuid
+  runtimeVersionId String              @db.Uuid
+  connectionId     String?             @db.Uuid
+  scanCursor       String?             @db.Uuid
+  nextScanAt       DateTime            @default(now())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent            WorkforceAgent      @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  runtimeVersion   AgentVersion        @relation(fields: [organizationId, runtimeVersionId], references: [organizationId, id], onDelete: Restrict)
+  connection       ExternalConnection? @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  cases            RecoveryCase[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId])
+}
+
+model RecoveryCase {
+  id                  String                @id @default(uuid()) @db.Uuid
+  organizationId      String                @db.Uuid
+  programId           String                @db.Uuid
+  opportunityId       String                @db.Uuid
+  contactId           String                @db.Uuid
+  conversationId      String?               @db.Uuid
+  pendingRunId        String?               @db.Uuid
+  latestResponseId    String?               @db.Uuid
+  state               String                @default("monitoring")
+  reason              String?
+  revision            Int                   @default(1)
+  attempts            Int                   @default(0)
+  nextDueAt           DateTime?
+  enrolledAt          DateTime              @default(now())
+  baselineActivityAt  DateTime
+  monitoredValueMinor Int
+  currency            String                @db.VarChar(3)
+  firstDeliveredAt    DateTime?
+  lastDeliveredAt     DateTime?
+  engagedAt           DateTime?
+  employeeActionAt    DateTime?
+  updatedAt           DateTime              @updatedAt
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  program             RecoveryProgram       @relation(fields: [organizationId, programId], references: [organizationId, id], onDelete: Restrict)
+  opportunity         Opportunity           @relation(fields: [organizationId, opportunityId], references: [organizationId, id], onDelete: Restrict)
+  contact             Contact               @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  conversation        Conversation?         @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Restrict)
+  pendingRun          AgentRun?             @relation(fields: [organizationId, pendingRunId], references: [organizationId, id], onDelete: Restrict)
+  latestResponse      Message?              @relation(fields: [organizationId, latestResponseId], references: [organizationId, id], onDelete: Restrict)
+  decisions           RecoveryDecision[]
+  handoff             RecoveryHandoff?
+  dispatches          RecoveryDispatch[]
+  attributions        RecoveryAttribution[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, opportunityId])
+  @@index([organizationId, state, nextDueAt])
+  @@index([organizationId, contactId])
+  @@index([organizationId, conversationId])
+}
+
+model RecoveryDecision {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  caseId         String       @db.Uuid
+  runId          String       @db.Uuid
+  caseRevision   Int
+  decision       Json
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  case           RecoveryCase @relation(fields: [organizationId, caseId], references: [organizationId, id], onDelete: Restrict)
+  run            AgentRun     @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, runId])
+}
+
+model RecoveryHandoff {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @db.Uuid
+  caseId           String              @db.Uuid
+  assignedMemberId String?             @db.Uuid
+  status           String              @default("open")
+  reason           String
+  summary          String
+  revision         Int                 @default(1)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  case             RecoveryCase        @relation(fields: [organizationId, caseId], references: [organizationId, id], onDelete: Restrict)
+  assignedMember   OrganizationMember? @relation(fields: [organizationId, assignedMemberId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, caseId])
+  @@index([organizationId, status, updatedAt])
+}
+
+model RecoveryConsent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  contactId      String       @db.Uuid
+  channel        String
+  granted        Boolean      @default(false)
+  evidence       String
+  recordedBy     String
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  contact        Contact      @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, contactId, channel])
+}
+
+model RecoveryDispatch {
+  communicationDelivery CommunicationDelivery?
+  runtimeVersion        AgentVersion           @relation(fields: [organizationId, runtimeVersionId], references: [organizationId, id], onDelete: Restrict)
+  id                    String                 @id @default(uuid()) @db.Uuid
+  organizationId        String                 @db.Uuid
+  caseId                String                 @db.Uuid
+  actionId              String?                @db.Uuid
+  requestKey            String
+  body                  String
+  channel               String
+  actor                 String
+  caseRevision          Int
+  runtimeVersionId      String                 @db.Uuid
+  status                String                 @default("pending")
+  transportAttempts     Int                    @default(0)
+  availableAt           DateTime               @default(now())
+  claimTokenHash        String?
+  claimedUntil          DateTime?
+  providerMessageId     String?
+  receiptHash           String?
+  errorCode             String?
+  deliveredAt           DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  case                  RecoveryCase           @relation(fields: [organizationId, caseId], references: [organizationId, id], onDelete: Restrict)
+  action                AgentAction?           @relation(fields: [organizationId, actionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, actionId])
+  @@unique([organizationId, requestKey])
+  @@unique([organizationId, providerMessageId])
+  @@index([organizationId, status, availableAt])
+}
+
+model RecoveryAttribution {
+  record           CrmRecord    @relation(fields: [organizationId, entityId], references: [organizationId, id], onDelete: Restrict)
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @db.Uuid
+  caseId           String       @db.Uuid
+  entityId         String       @db.Uuid
+  kind             String
+  status           String       @default("NOT_ATTRIBUTED")
+  amountMinor      Int          @default(0)
+  currency         String       @db.VarChar(3)
+  evidence         Json
+  paymentReference String?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  occurredAt       DateTime
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  case             RecoveryCase @relation(fields: [organizationId, caseId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, kind, entityId])
+  @@unique([organizationId, paymentReference])
+}
+
+model RecoverySimulation {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  scenarioKey    String?
+  input          Json
+  result         Json
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+}
+
+model Organization {
+  backgroundTasks           BackgroundTask[]
+  communicationAccounts     CommunicationAccount[]
+  communicationDeliveries   CommunicationDelivery[]
+  communicationAttempts     CommunicationAttempt[]
+  communicationSuppressions CommunicationSuppression[]
+  knowledgeRevision         Int                        @default(0)
+  knowledgeSources          KnowledgeSource[]
+  knowledgeDocuments        KnowledgeDocument[]
+  knowledgeEntries          KnowledgeEntry[]
+  knowledgeVersions         KnowledgeVersion[]
+  active                    Boolean                    @default(true)
+  recoveryProgram           RecoveryProgram?
+  recoveryCases             RecoveryCase[]
+  recoveryDecisions         RecoveryDecision[]
+  recoveryHandoffs          RecoveryHandoff[]
+  recoveryConsents          RecoveryConsent[]
+  recoveryDispatches        RecoveryDispatch[]
+  recoveryAttributions      RecoveryAttribution[]
+  recoverySimulations       RecoverySimulation[]
+  id                        String                     @id @default(uuid()) @db.Uuid
+  name                      String
+  legacyClientId            String?                    @unique @db.Uuid
+  createdAt                 DateTime                   @default(now())
+  legacyClient              Client?                    @relation(fields: [legacyClientId], references: [id], onDelete: Restrict)
+  memberships               OrganizationMember[]
+  credentials               WorkforceCredential[]
+  integrations              ExternalConnection[]
+  customers                 Contact[]
+  opportunities             Opportunity[]
+  events                    BusinessEvent[]
+  jobs                      WorkforceJob[]
+  agents                    WorkforceAgent[]
+  runs                      WorkforceRun[]
+  actions                   WorkforceAction[]
+  approvals                 WorkforceApproval[]
+  audits                    AuditLog[]
+  attributions              WorkforceRevenue[]
+  timezone                  String                     @default("UTC")
+  defaultCurrency           String                     @default("USD") @db.VarChar(3)
+  records                   CrmRecord[]
+  companies                 Company[]
+  pipelines                 Pipeline[]
+  stages                    PipelineStage[]
+  estimates                 Estimate[]
+  appointments              Appointment[]
+  tasks                     Task[]
+  notes                     Note[]
+  conversations             Conversation[]
+  messages                  Message[]
+  tags                      Tag[]
+  recordTags                RecordTag[]
+  fieldDefinitions          CustomFieldDefinition[]
+  fieldValues               CustomFieldValue[]
+  externalMappings          ExternalRecordMapping[]
+  eventDeliveries           EventDelivery[]
+  eventIntakes              EventIntake[]
+  eventLinks                BusinessEventLink[]
+  webhookEndpoints          WebhookEndpoint[]
+  outboundDeliveries        OutboundDelivery[]
+  outboundAttempts          OutboundAttempt[]
+  integrationActivity       IntegrationActivity[]
+  webhookLimit              OrganizationWebhookLimit?
+  agentVersions             AgentVersion[]
+  agentGoals                AgentGoal[]
+  agentTriggers             AgentTrigger[]
+  agentPolicies             AgentPolicy[]
+  agentPermissions          AgentToolPermission[]
+  agentEscalations          AgentEscalationRule[]
+  agentRuns                 AgentRun[]
+  agentSteps                AgentStep[]
+  agentActions              AgentAction[]
+  humanApprovals            HumanApproval[]
+  agentResults              AgentResult[]
+  agentSchedules            AgentSchedule[]
+  blueprints                AgentBlueprint[]
+  blueprintVersions         AgentBlueprintVersion[]
+  blueprintTests            AgentBlueprintTest[]
+  blueprintGenerations      AgentBlueprintGeneration[]
+}
+
+model CommunicationAccount {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  organizationId       String                  @db.Uuid
+  connectionId         String                  @unique @db.Uuid
+  provider             String
+  channel              String
+  sender               String
+  externalAccountId    String
+  encryptedCredentials String
+  enabled              Boolean                 @default(false)
+  revision             Int                     @default(1)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection           ExternalConnection      @relation(fields: [organizationId, connectionId, provider], references: [organizationId, id, provider], onDelete: Restrict)
+  deliveries           CommunicationDelivery[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, channel])
+  @@unique([organizationId, connectionId, provider])
+  @@unique([provider, externalAccountId, sender])
+}
+
+model CommunicationDelivery {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  organizationId     String                 @db.Uuid
+  messageId          String                 @db.Uuid
+  conversationId     String                 @db.Uuid
+  contactId          String                 @db.Uuid
+  accountId          String?                @db.Uuid
+  connectionId       String?                @db.Uuid
+  recoveryDispatchId String?                @db.Uuid
+  provider           String
+  channel            String
+  direction          String
+  actor              String
+  requestKey         String
+  payloadHash        String
+  sender             String?
+  recipient          String?
+  externalId         String?
+  status             String
+  errorCode          String?
+  attempts           Int                    @default(0)
+  availableAt        DateTime               @default(now())
+  leaseToken         String?                @db.Uuid
+  leasedUntil        DateTime?
+  acceptedAt         DateTime?
+  deliveredAt        DateTime?
+  statusAt           DateTime               @default(now())
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  message            Message                @relation(fields: [organizationId, messageId, conversationId], references: [organizationId, id, conversationId], onDelete: Restrict)
+  conversation       Conversation           @relation(fields: [organizationId, conversationId, contactId], references: [organizationId, id, contactId], onDelete: Restrict)
+  contact            Contact                @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  account            CommunicationAccount?  @relation(fields: [organizationId, accountId], references: [organizationId, id], onDelete: Restrict)
+  connection         ExternalConnection?    @relation(fields: [organizationId, connectionId, provider], references: [organizationId, id, provider], onDelete: Restrict)
+  recoveryDispatch   RecoveryDispatch?      @relation(fields: [organizationId, recoveryDispatchId], references: [organizationId, id], onDelete: Restrict)
+  history            CommunicationAttempt[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, messageId])
+  @@unique([organizationId, messageId, conversationId])
+  @@unique([organizationId, recoveryDispatchId])
+  @@unique([organizationId, requestKey])
+  @@unique([organizationId, provider, connectionId, externalId])
+  @@index([status, availableAt])
+}
+
+model CommunicationAttempt {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @db.Uuid
+  deliveryId     String                @db.Uuid
+  eventKey       String
+  status         String
+  errorCode      String?
+  externalId     String?
+  occurredAt     DateTime              @default(now())
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  delivery       CommunicationDelivery @relation(fields: [organizationId, deliveryId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, deliveryId, eventKey])
+}
+
+model CommunicationSuppression {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  channel        String
+  addressHash    String
+  reason         String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, channel, addressHash])
+}
+
+model KnowledgeSource {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  name           String
+  reference      String?
+  active         Boolean             @default(true)
+  revision       Int                 @default(1)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  documents      KnowledgeDocument[]
+  entries        KnowledgeEntry[]
+
+  @@unique([organizationId, id])
+}
+
+model KnowledgeDocument {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  sourceId       String           @db.Uuid
+  filename       String
+  content        String
+  contentHash    String
+  active         Boolean          @default(true)
+  revision       Int              @default(1)
+  createdBy      String
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  source         KnowledgeSource  @relation(fields: [organizationId, sourceId], references: [organizationId, id], onDelete: Restrict)
+  entries        KnowledgeEntry[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, sourceId, id])
+  @@unique([organizationId, sourceId, contentHash])
+}
+
+model KnowledgeEntry {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @db.Uuid
+  sourceId          String             @db.Uuid
+  documentId        String?            @db.Uuid
+  category          String
+  audience          String             @default("internal")
+  active            Boolean            @default(false)
+  revision          Int                @default(1)
+  latestVersion     Int                @default(1)
+  approvedVersionId String?            @db.Uuid
+  approvedBy        String?
+  approvedAt        DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  source            KnowledgeSource    @relation(fields: [organizationId, sourceId], references: [organizationId, id], onDelete: Restrict)
+  document          KnowledgeDocument? @relation(fields: [organizationId, sourceId, documentId], references: [organizationId, sourceId, id], onDelete: Restrict)
+  versions          KnowledgeVersion[] @relation("EntryVersions")
+  approvedVersion   KnowledgeVersion?  @relation("ApprovedKnowledge", fields: [organizationId, id, approvedVersionId], references: [organizationId, entryId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@index([organizationId, active, category])
+}
+
+model KnowledgeVersion {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  entryId        String           @db.Uuid
+  number         Int
+  title          String
+  question       String?
+  content        String
+  facts          Json
+  risk           String
+  createdBy      String
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entry          KnowledgeEntry   @relation("EntryVersions", fields: [organizationId, entryId], references: [organizationId, id], onDelete: Restrict)
+  approvals      KnowledgeEntry[] @relation("ApprovedKnowledge")
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, entryId, id])
+  @@unique([organizationId, entryId, number])
+}
+
+enum OrganizationRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+model OrganizationMember {
+  recoveryHandoffs RecoveryHandoff[]
+  id               String                @id @default(uuid()) @db.Uuid
+  organizationId   String                @db.Uuid
+  // Opaque verified identity subject; no passwords or self-asserted HTTP identity.
+  subject          String
+  role             OrganizationRole      @default(viewer)
+  active           Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  credentials      WorkforceCredential[]
+  userId           String?               @db.Uuid
+  displayName      String?
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  assignments      CrmRecord[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, subject])
+  @@unique([organizationId, userId])
+  @@map("OrganizationMembership")
+}
+
+model WorkforceCredential {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  membershipId   String?             @db.Uuid
+  integrationId  String?             @db.Uuid
+  tokenHash      String              @unique
+  scopes         String[]
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  membership     OrganizationMember? @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Restrict)
+  integration    ExternalConnection? @relation(fields: [organizationId, integrationId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId])
+}
+
+enum WorkforceIntegrationProvider {
+  zapier
+  generic_webhook
+  ghl
+}
+
+model ExternalConnection {
+  communicationAccount    CommunicationAccount?
+  communicationDeliveries CommunicationDelivery[]
+  recoveryPrograms        RecoveryProgram[]
+  id                      String                  @id @default(uuid()) @db.Uuid
+  organizationId          String                  @db.Uuid
+  name                    String
+  provider                String
+  enabled                 Boolean                 @default(true)
+  externalAccountId       String?
+  webhookMapping          Json?
+  businessEvents          BusinessEvent[]
+  eventIntakes            EventIntake[]
+  createdAt               DateTime                @default(now())
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  credentials             WorkforceCredential[]
+  mappings                ExternalRecordMapping[]
+  integrationActivity     IntegrationActivity[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, provider])
+  @@map("WorkforceIntegration")
+}
+
+model Contact {
+  communicationDeliveries CommunicationDelivery[]
+  recoveryCases           RecoveryCase[]
+  recoveryConsents        RecoveryConsent[]
+  id                      String                  @id @default(uuid()) @db.Uuid
+  organizationId          String                  @db.Uuid
+  source                  String?
+  externalId              String?
+  name                    String
+  email                   String?
+  phone                   String?
+  doNotContact            Boolean                 @default(false)
+  sourceOccurredAt        DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  opportunities           Opportunity[]
+  firstName               String?
+  lastName                String?
+  companyId               String?                 @db.Uuid
+  company                 Company?                @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Restrict)
+  appointments            Appointment[]
+  conversations           Conversation[]
+
+  entityType CrmEntityType @default(contact)
+  record     CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, source, externalId])
+  @@unique([organizationId, id, entityType])
+  @@map("WorkforceCustomer")
+}
+
+enum WorkforceOpportunityStatus {
+  open
+  estimate_sent
+  won
+  lost
+}
+
+model Opportunity {
+  recoveryCase     RecoveryCase?
+  id               String                     @id @default(uuid()) @db.Uuid
+  organizationId   String                     @db.Uuid
+  customerId       String                     @db.Uuid
+  source           String?
+  externalId       String?
+  title            String
+  status           WorkforceOpportunityStatus @default(open)
+  amountMinor      Int
+  currency         String                     @db.VarChar(3)
+  lastActivityAt   DateTime
+  sourceOccurredAt DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  organization     Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer         Contact                    @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  actions          WorkforceAction[]
+  revenues         WorkforceRevenue[]
+  pipelineId       String?                    @db.Uuid
+  stageId          String?                    @db.Uuid
+  companyId        String?                    @db.Uuid
+  company          Company?                   @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Restrict)
+  stage            PipelineStage?             @relation(fields: [organizationId, pipelineId, stageId], references: [organizationId, pipelineId, id], onDelete: Restrict)
+  estimates        Estimate[]
+  appointments     Appointment[]
+
+  entityType CrmEntityType @default(opportunity)
+  record     CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, source, externalId])
+  @@unique([organizationId, id, entityType])
+  @@index([organizationId, status, lastActivityAt])
+  @@index([organizationId, pipelineId, stageId])
+  @@map("WorkforceOpportunity")
+}
+
+model BusinessEvent {
+  id                 String              @id @default(uuid()) @db.Uuid
+  organizationId     String              @db.Uuid
+  source             String
+  externalId         String
+  type               String
+  version            Int                 @default(1)
+  payload            Json
+  payloadHash        String
+  occurredAt         DateTime
+  receivedAt         DateTime            @default(now())
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  jobs               WorkforceJob[]
+  runs               WorkforceRun[]
+  agentRuns          AgentRun[]
+  links              BusinessEventLink[]
+  provider           String?
+  connectionId       String?             @db.Uuid
+  entityType         String?
+  entityId           String?             @db.Uuid
+  recordId           String?             @db.Uuid
+  recordType         CrmEntityType?
+  externalRecordType String?
+  externalRecordId   String?
+  correlationId      String?             @db.Uuid
+  causationId        String?             @db.Uuid
+  actor              String?
+  metadata           Json?
+  connection         ExternalConnection? @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  record             CrmRecord?          @relation("EventSubject", fields: [organizationId, recordId, recordType], references: [organizationId, id, entityType], onDelete: Restrict)
+  cause              BusinessEvent?      @relation("EventCausation", fields: [organizationId, causationId], references: [organizationId, id], onDelete: Restrict)
+  effects            BusinessEvent[]     @relation("EventCausation")
+  deliveries         EventDelivery[]
+  intakes            EventIntake[]
+  outboundDeliveries OutboundDelivery[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, source, externalId])
+  @@index([organizationId, type, occurredAt])
+  @@index([organizationId, correlationId, receivedAt])
+  @@index([organizationId, entityType, entityId, occurredAt])
+  @@map("WorkforceEvent")
+}
+
+enum WorkforceJobStatus {
+  pending
+  running
+  completed
+  dead
+}
+
+model WorkforceJob {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  eventId        String             @db.Uuid
+  status         WorkforceJobStatus @default(pending)
+  attempts       Int                @default(0)
+  availableAt    DateTime           @default(now())
+  leaseToken     String?            @db.Uuid
+  leasedUntil    DateTime?
+  lastErrorCode  String?
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  event          BusinessEvent      @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, eventId])
+  @@index([status, availableAt, leasedUntil])
+}
+
+model WorkforceAgent {
+  recoveryProgram RecoveryProgram?
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @db.Uuid
+  name            String
+  kind            String           @default("revenue_recovery")
+  description     String
+  config          Json
+  configVersion   Int              @default(1)
+  enabled         Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  runs            WorkforceRun[]
+  versions        AgentVersion[]
+  runtimeRuns     AgentRun[]
+  runtimeActions  AgentAction[]
+  schedules       AgentSchedule[]
+  blueprint       AgentBlueprint?
+
+  @@unique([organizationId, id])
+  @@index([organizationId, enabled])
+}
+
+model AgentVersion {
+  recoveryDispatches RecoveryDispatch[]
+  specialization     Json?
+  recoveryPrograms   RecoveryProgram[]
+  id                 String                  @id @default(uuid()) @db.Uuid
+  organizationId     String                  @db.Uuid
+  agentId            String                  @db.Uuid
+  number             Int
+  definition         Json
+  definitionHash     String
+  createdBy          String
+  createdAt          DateTime                @default(now())
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent              WorkforceAgent          @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  goals              AgentGoal[]
+  triggers           AgentTrigger[]
+  policy             AgentPolicy?
+  permissions        AgentToolPermission[]
+  escalations        AgentEscalationRule[]
+  runs               AgentRun[]
+  blueprintVersions  AgentBlueprintVersion[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId, number])
+  @@unique([organizationId, agentId, id])
+}
+
+model AgentBlueprint {
+  id             String                  @id @default(uuid()) @db.Uuid
+  organizationId String                  @db.Uuid
+  name           String
+  currentVersion Int                     @default(1)
+  agentId        String?                 @db.Uuid
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent          WorkforceAgent?         @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  versions       AgentBlueprintVersion[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId])
+}
+
+model AgentBlueprintVersion {
+  id                String                     @id @default(uuid()) @db.Uuid
+  organizationId    String                     @db.Uuid
+  blueprintId       String                     @db.Uuid
+  number            Int
+  specification     Json
+  specificationHash String
+  sourceText        String?
+  origin            String
+  provider          String?
+  model             String?
+  createdBy         String
+  createdAt         DateTime                   @default(now())
+  activatedAt       DateTime?
+  activatedBy       String?
+  runtimeVersionId  String?                    @db.Uuid
+  organization      Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  blueprint         AgentBlueprint             @relation(fields: [organizationId, blueprintId], references: [organizationId, id], onDelete: Restrict)
+  runtimeVersion    AgentVersion?              @relation(fields: [organizationId, runtimeVersionId], references: [organizationId, id], onDelete: Restrict)
+  tests             AgentBlueprintTest[]
+  generations       AgentBlueprintGeneration[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, blueprintId, number])
+}
+
+model AgentBlueprintTest {
+  id                String                @id @default(uuid()) @db.Uuid
+  organizationId    String                @db.Uuid
+  versionId         String                @db.Uuid
+  compilerVersion   String
+  specificationHash String
+  scenario          Json
+  report            Json
+  createdBy         String
+  createdAt         DateTime              @default(now())
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version           AgentBlueprintVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, versionId, createdAt])
+}
+
+model AgentBlueprintGeneration {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  requestKey     String
+  requestHash    String
+  status         String                 @default("running")
+  errorCode      String?
+  versionId      String?                @db.Uuid
+  createdAt      DateTime               @default(now())
+  completedAt    DateTime?
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        AgentBlueprintVersion? @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, requestKey])
+  @@index([organizationId, createdAt])
+}
+
+model AgentGoal {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @db.Uuid
+  versionId       String       @db.Uuid
+  objective       String
+  successCriteria Json
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version         AgentVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+}
+
+model AgentTrigger {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  versionId      String       @db.Uuid
+  eventType      String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        AgentVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, versionId, eventType])
+}
+
+model AgentPolicy {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  versionId      String       @db.Uuid
+  rules          Json
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        AgentVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, versionId])
+}
+
+model AgentToolPermission {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  versionId      String       @db.Uuid
+  tool           String
+  automatic      Boolean      @default(false)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        AgentVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, versionId, tool])
+}
+
+model AgentEscalationRule {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  versionId      String       @db.Uuid
+  condition      String
+  outcome        String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  version        AgentVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, versionId, condition])
+}
+
+model AgentRun {
+  recoveryCases    RecoveryCase[]
+  recoveryDecision RecoveryDecision?
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  agentId          String            @db.Uuid
+  versionId        String            @db.Uuid
+  eventId          String?           @db.Uuid
+  subjectId        String            @db.Uuid
+  triggerKey       String
+  trigger          Json
+  correlationId    String            @db.Uuid
+  status           String            @default("pending")
+  stepCount        Int               @default(0)
+  actionCount      Int               @default(0)
+  availableAt      DateTime          @default(now())
+  leaseToken       String?           @db.Uuid
+  leasedUntil      DateTime?
+  startedAt        DateTime?
+  deadlineAt       DateTime
+  completedAt      DateTime?
+  errorCode        String?
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent            WorkforceAgent    @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  version          AgentVersion      @relation(fields: [organizationId, agentId, versionId], references: [organizationId, agentId, id], onDelete: Restrict)
+  event            BusinessEvent?    @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+  subject          CrmRecord         @relation(fields: [organizationId, subjectId], references: [organizationId, id], onDelete: Restrict)
+  steps            AgentStep[]
+  actions          AgentAction[]
+  result           AgentResult?
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId, triggerKey])
+  @@index([status, availableAt, leasedUntil])
+  @@index([organizationId, agentId, createdAt])
+}
+
+model AgentStep {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  runId          String       @db.Uuid
+  sequence       Int
+  context        Json
+  decision       Json?
+  policyResult   Json?
+  result         Json?
+  provider       String
+  model          String
+  status         String       @default("planning")
+  errorCode      String?
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run            AgentRun     @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, runId, sequence])
+}
+
+model AgentAction {
+  recoveryDispatch   RecoveryDispatch?
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @db.Uuid
+  agentId            String            @db.Uuid
+  runId              String            @db.Uuid
+  sequence           Int
+  tool               String
+  input              Json
+  deduplicationKey   String
+  subjectVersion     Int
+  contextFingerprint String
+  policyResult       Json
+  status             String
+  result             Json?
+  errorCode          String?
+  createdAt          DateTime          @default(now())
+  completedAt        DateTime?
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent              WorkforceAgent    @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  run                AgentRun          @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Restrict)
+  approval           HumanApproval?
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId, deduplicationKey])
+  @@unique([organizationId, runId, sequence])
+  @@index([organizationId, status, createdAt])
+}
+
+model HumanApproval {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actionId       String       @db.Uuid
+  status         String       @default("pending")
+  expiresAt      DateTime
+  decidedAt      DateTime?
+  decidedBy      String?
+  reason         String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  action         AgentAction  @relation(fields: [organizationId, actionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, actionId])
+  @@index([organizationId, status, expiresAt])
+}
+
+model AgentResult {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  runId          String       @db.Uuid
+  outcome        String
+  summary        String
+  // A model recommendation is not proof of business or financial success.
+  evidence       Json
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run            AgentRun     @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, runId])
+}
+
+model AgentSchedule {
+  id              String         @id @default(uuid()) @db.Uuid
+  organizationId  String         @db.Uuid
+  agentId         String         @db.Uuid
+  subjectId       String         @db.Uuid
+  nextRunAt       DateTime
+  intervalMinutes Int?
+  remainingRuns   Int            @default(1)
+  enabled         Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent           WorkforceAgent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  subject         CrmRecord      @relation(fields: [organizationId, subjectId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@index([enabled, nextRunAt])
+}
+
+model WorkforceRun {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  agentId        String            @db.Uuid
+  eventId        String            @db.Uuid
+  configVersion  Int
+  configSnapshot Json
+  decision       Json
+  createdAt      DateTime          @default(now())
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  agent          WorkforceAgent    @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Restrict)
+  event          BusinessEvent     @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+  actions        WorkforceAction[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, agentId, eventId])
+}
+
+enum WorkforceActionStatus {
+  pending_approval
+  rejected
+  completed
+  blocked
+}
+
+model WorkforceAction {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @db.Uuid
+  runId          String                @db.Uuid
+  opportunityId  String                @db.Uuid
+  tool           String
+  input          Json
+  result         Json?
+  policyDecision Json
+  status         WorkforceActionStatus @default(pending_approval)
+  createdAt      DateTime              @default(now())
+  completedAt    DateTime?
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  run            WorkforceRun          @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Restrict)
+  opportunity    Opportunity           @relation(fields: [organizationId, opportunityId], references: [organizationId, id], onDelete: Restrict)
+  approval       WorkforceApproval?
+  revenues       WorkforceRevenue[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, runId, opportunityId, tool])
+  @@index([organizationId, opportunityId, createdAt])
+}
+
+enum WorkforceApprovalStatus {
+  pending
+  approved
+  rejected
+  expired
+}
+
+model WorkforceApproval {
+  id             String                  @id @default(uuid()) @db.Uuid
+  organizationId String                  @db.Uuid
+  actionId       String                  @db.Uuid
+  status         WorkforceApprovalStatus @default(pending)
+  expiresAt      DateTime
+  decidedBy      String?
+  reason         String?
+  decidedAt      DateTime?
+  createdAt      DateTime                @default(now())
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  action         WorkforceAction         @relation(fields: [organizationId, actionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, actionId])
+  @@index([organizationId, status, expiresAt])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actor          String
+  type           String
+  subjectId      String
+  details        Json
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@map("WorkforceAudit")
+}
+
+model WorkforceRevenue {
+  id                String          @id @default(uuid()) @db.Uuid
+  organizationId    String          @db.Uuid
+  opportunityId     String          @db.Uuid
+  actionId          String          @db.Uuid
+  externalPaymentId String
+  amountMinor       Int
+  currency          String          @db.VarChar(3)
+  evidence          String
+  recordedBy        String
+  paidAt            DateTime
+  createdAt         DateTime        @default(now())
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  opportunity       Opportunity     @relation(fields: [organizationId, opportunityId], references: [organizationId, id], onDelete: Restrict)
+  action            WorkforceAction @relation(fields: [organizationId, actionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, externalPaymentId])
+  @@index([organizationId, currency, paidAt])
 }
 
 model SmsConversation {
@@ -1178,4 +2306,535 @@ model SalesDemoSession {
   @@index([demoId, createdAt])
   @@index([channel, endedAt, expiresAt])
   @@index([createdAt])
+}
+
+model Company {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  entityType     CrmEntityType @default(company)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  name           String
+  domain         String?
+  email          String?
+  phone          String?
+  contacts       Contact[]
+  opportunities  Opportunity[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model Pipeline {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  entityType     CrmEntityType   @default(pipeline)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord       @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  name           String
+  description    String?
+  stages         PipelineStage[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model PipelineStage {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  entityType     CrmEntityType @default(pipeline_stage)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  pipelineId     String        @db.Uuid
+  name           String
+  position       Int
+  outcome        StageOutcome  @default(open)
+  pipeline       Pipeline      @relation(fields: [organizationId, pipelineId], references: [organizationId, id], onDelete: Restrict)
+  opportunities  Opportunity[]
+
+  @@unique([organizationId, pipelineId, id])
+  @@unique([organizationId, pipelineId, position])
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model Estimate {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  entityType     CrmEntityType  @default(estimate)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord      @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  opportunityId  String         @db.Uuid
+  number         String
+  title          String
+  status         EstimateStatus @default(draft)
+  amountMinor    Int
+  currency       String         @db.VarChar(3)
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  acceptedAt     DateTime?
+  opportunity    Opportunity    @relation(fields: [organizationId, opportunityId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, number])
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model Appointment {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  entityType     CrmEntityType     @default(appointment)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord         @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  contactId      String            @db.Uuid
+  opportunityId  String?           @db.Uuid
+  title          String
+  startsAt       DateTime
+  endsAt         DateTime
+  timezone       String
+  location       String?
+  status         AppointmentStatus @default(scheduled)
+  contact        Contact           @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  opportunity    Opportunity?      @relation(fields: [organizationId, opportunityId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+  @@index([organizationId, startsAt])
+}
+
+model Task {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @db.Uuid
+  entityType      CrmEntityType @default(task)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record          CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  title           String
+  description     String?
+  status          TaskStatus    @default(open)
+  priority        TaskPriority  @default(normal)
+  dueAt           DateTime?
+  completedAt     DateTime?
+  relatedRecordId String?       @db.Uuid
+  relatedRecord   CrmRecord?    @relation("TaskRelated", fields: [organizationId, relatedRecordId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+  @@index([organizationId, status, dueAt])
+}
+
+model Note {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @db.Uuid
+  entityType      CrmEntityType @default(note)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record          CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  body            String
+  relatedRecordId String        @db.Uuid
+  relatedRecord   CrmRecord     @relation("NoteRelated", fields: [organizationId, relatedRecordId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model Conversation {
+  communicationDeliveries CommunicationDelivery[]
+  recoveryCases           RecoveryCase[]
+  id                      String                  @id @default(uuid()) @db.Uuid
+  organizationId          String                  @db.Uuid
+  entityType              CrmEntityType           @default(conversation)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record                  CrmRecord               @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  contactId               String                  @db.Uuid
+  subject                 String
+  channel                 ConversationChannel
+  status                  ConversationStatus      @default(open)
+  contact                 Contact                 @relation(fields: [organizationId, contactId], references: [organizationId, id], onDelete: Restrict)
+  messages                Message[]
+
+  @@unique([organizationId, id, contactId])
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+model Message {
+  communicationDelivery CommunicationDelivery?
+  recoveryResponses     RecoveryCase[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  organizationId        String                 @db.Uuid
+  entityType            CrmEntityType          @default(message)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record                CrmRecord              @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  conversationId        String                 @db.Uuid
+  direction             MessageDirection
+  body                  String
+  status                MessageStatus          @default(recorded)
+  occurredAt            DateTime
+  conversation          Conversation           @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id, conversationId])
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+  @@index([organizationId, conversationId, occurredAt])
+}
+
+model Tag {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  entityType     CrmEntityType @default(tag)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord     @relation(fields: [organizationId, id, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+  name           String
+  color          String        @default("#526174")
+  records        RecordTag[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+}
+
+enum CrmEntityType {
+  contact
+  company
+  opportunity
+  pipeline
+  pipeline_stage
+  estimate
+  appointment
+  task
+  note
+  conversation
+  message
+  tag
+}
+
+enum StageOutcome {
+  open
+  won
+  lost
+}
+
+enum EstimateStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+}
+
+enum AppointmentStatus {
+  scheduled
+  completed
+  cancelled
+  no_show
+}
+
+enum TaskStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum ConversationChannel {
+  email
+  sms
+  phone
+  web
+  other
+}
+
+enum ConversationStatus {
+  open
+  closed
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+  internal
+}
+
+enum MessageStatus {
+  recorded
+  draft
+  sent
+  delivered
+  failed
+}
+
+enum CustomFieldType {
+  text
+  number
+  boolean
+  date
+  single_select
+  multi_select
+}
+
+model User {
+  id              String               @id @default(uuid()) @db.Uuid
+  externalSubject String               @unique
+  name            String?
+  email           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  memberships     OrganizationMember[]
+}
+
+// A typed, tenant-owned identity for polymorphic relationships. Domain rows keep their IDs.
+model CrmRecord {
+  recoveryAttributions RecoveryAttribution[]
+  id                   String                  @id @db.Uuid
+  organizationId       String                  @db.Uuid
+  entityType           CrmEntityType
+  version              Int                     @default(1)
+  archivedAt           DateTime?
+  assignedMemberId     String?                 @db.Uuid
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  organization         Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignedMember       OrganizationMember?     @relation(fields: [organizationId, assignedMemberId], references: [organizationId, id], onDelete: Restrict)
+  contact              Contact?
+  opportunity          Opportunity?
+  company              Company?
+  pipeline             Pipeline?
+  pipelineStage        PipelineStage?
+  estimate             Estimate?
+  appointment          Appointment?
+  task                 Task?
+  note                 Note?
+  conversation         Conversation?
+  message              Message?
+  tag                  Tag?
+  mappings             ExternalRecordMapping[]
+  fields               CustomFieldValue[]
+  tags                 RecordTag[]
+  events               BusinessEventLink[]
+  relatedTasks         Task[]                  @relation("TaskRelated")
+  relatedNotes         Note[]                  @relation("NoteRelated")
+  subjectEvents        BusinessEvent[]         @relation("EventSubject")
+  agentRuns            AgentRun[]
+  agentSchedules       AgentSchedule[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, id, entityType])
+  @@index([organizationId, entityType, archivedAt, id])
+  @@index([organizationId, assignedMemberId])
+}
+
+model ExternalRecordMapping {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizationId     String             @db.Uuid
+  connectionId       String             @db.Uuid
+  provider           String
+  externalRecordType String
+  externalId         String
+  internalEntityType CrmEntityType
+  internalEntityId   String             @db.Uuid
+  sourceUpdatedAt    DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection         ExternalConnection @relation(fields: [organizationId, connectionId, provider], references: [organizationId, id, provider], onDelete: Restrict)
+  record             CrmRecord          @relation(fields: [organizationId, internalEntityId, internalEntityType], references: [organizationId, id, entityType], onDelete: Restrict)
+
+  @@unique([organizationId, connectionId, externalRecordType, externalId])
+  @@index([organizationId, internalEntityType, internalEntityId])
+}
+
+model CustomFieldDefinition {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  entityType     CrmEntityType
+  key            String
+  label          String
+  fieldType      CustomFieldType
+  required       Boolean            @default(false)
+  options        String[]           @default([])
+  archivedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  values         CustomFieldValue[]
+
+  @@unique([organizationId, entityType, key])
+  @@unique([organizationId, id, entityType, fieldType])
+}
+
+model CustomFieldValue {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String                @db.Uuid
+  definitionId   String                @db.Uuid
+  recordId       String                @db.Uuid
+  entityType     CrmEntityType
+  fieldType      CustomFieldType
+  value          Json
+  updatedAt      DateTime              @updatedAt
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  definition     CustomFieldDefinition @relation(fields: [organizationId, definitionId, entityType, fieldType], references: [organizationId, id, entityType, fieldType], onDelete: Restrict)
+  record         CrmRecord             @relation(fields: [organizationId, recordId, entityType], references: [organizationId, id, entityType], onDelete: Restrict)
+
+  @@unique([organizationId, definitionId, recordId])
+  @@index([organizationId, recordId])
+}
+
+model RecordTag {
+  organizationId String       @db.Uuid
+  recordId       String       @db.Uuid
+  tagId          String       @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  record         CrmRecord    @relation(fields: [organizationId, recordId], references: [organizationId, id], onDelete: Restrict)
+  tag            Tag          @relation(fields: [organizationId, tagId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, recordId, tagId])
+}
+
+model BusinessEventLink {
+  organizationId String        @db.Uuid
+  eventId        String        @db.Uuid
+  recordId       String        @db.Uuid
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  event          BusinessEvent @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+  record         CrmRecord     @relation(fields: [organizationId, recordId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, eventId, recordId])
+  @@index([organizationId, recordId, eventId])
+}
+
+// Completed DB-only handler effects and their receipt commit in the worker transaction.
+model EventDelivery {
+  organizationId String        @db.Uuid
+  eventId        String        @db.Uuid
+  handlerId      String
+  processedAt    DateTime      @default(now())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  event          BusinessEvent @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, eventId, handlerId])
+}
+
+// Receipt precedes normalization/projection. One delivery can generate several domain facts.
+model EventIntake {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  source         String
+  externalId     String
+  payloadHash    String
+  connectionId   String?             @db.Uuid
+  eventId        String?             @db.Uuid
+  result         Json
+  receivedAt     DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection     ExternalConnection? @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+  event          BusinessEvent?      @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, source, externalId])
+}
+
+model WebhookEndpoint {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizationId     String             @db.Uuid
+  name               String
+  host               String
+  encryptedUrl       String
+  encryptedSecret    String
+  events             String[]
+  includeExternal    Boolean            @default(false)
+  includeContactData Boolean            @default(false)
+  enabled            Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deliveries         OutboundDelivery[]
+
+  @@unique([organizationId, id])
+}
+
+model OutboundDelivery {
+  id               String            @id @default(uuid()) @db.Uuid
+  organizationId   String            @db.Uuid
+  endpointId       String            @db.Uuid
+  eventId          String?           @db.Uuid
+  deduplicationKey String
+  payload          Json
+  status           String            @default("pending")
+  attempts         Int               @default(0)
+  attemptsAllowed  Int               @default(8)
+  availableAt      DateTime          @default(now())
+  leaseToken       String?           @db.Uuid
+  leasedUntil      DateTime?
+  lastErrorCode    String?
+  completedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  endpoint         WebhookEndpoint   @relation(fields: [organizationId, endpointId], references: [organizationId, id], onDelete: Restrict)
+  event            BusinessEvent?    @relation(fields: [organizationId, eventId], references: [organizationId, id], onDelete: Restrict)
+  history          OutboundAttempt[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, endpointId, deduplicationKey])
+  @@index([status, availableAt])
+  @@index([organizationId, createdAt])
+}
+
+model OutboundAttempt {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  deliveryId     String           @db.Uuid
+  attempt        Int
+  statusCode     Int?
+  errorCode      String?
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  delivery       OutboundDelivery @relation(fields: [organizationId, deliveryId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, deliveryId, attempt])
+}
+
+model IntegrationActivity {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @db.Uuid
+  connectionId   String             @db.Uuid
+  payloadHash    String
+  summary        Json
+  statusCode     Int
+  code           String
+  createdAt      DateTime           @default(now())
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection     ExternalConnection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+}
+
+model OrganizationWebhookLimit {
+  organizationId String       @id @db.Uuid
+  window         DateTime
+  count          Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 }

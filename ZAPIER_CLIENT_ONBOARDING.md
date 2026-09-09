@@ -1,6 +1,16 @@
 # Zapier Client Onboarding Guide
 
+For the full AI workforce rollout—including separate Railway services and new-client
+onboarding—start with [AI Workforce Setup and Client Onboarding](AI_WORKFORCE_SETUP_AND_CLIENT_ONBOARDING.md).
+
+For **CRM → Zapier → Steel Scale** and **Steel Scale → Zapier → CRM**, use
+[the universal integration guide](docs/ZAPIER_INTEGRATION.md). It documents organization-specific
+credentials, flexible record mapping, canonical events and durable outbound delivery.
+The booking/availability onboarding below remains separate and supported.
+
 Use this guide when a new client wants Steel Scale's voice agent to check a calendar and create appointments through Zapier.
+
+For the new optional workforce CRM event intake (customers and unsold opportunities), see [Workforce API examples](docs/WORKFORCE_API.md). That separate, disabled-by-default integration does not require changes to the booking or availability Zaps below.
 
 Each client needs **two separate Zaps**:
 

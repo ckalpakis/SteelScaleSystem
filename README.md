@@ -1,8 +1,36 @@
 # Steel Scale System
 
-A lightweight, multi-tenant missed-call and booking automation service for home-service businesses. This repository currently contains application scaffolding only.
+For step-by-step Railway service setup and repeatable client onboarding, start with
+[AI Workforce Setup and Client Onboarding](AI_WORKFORCE_SETUP_AND_CLIENT_ONBOARDING.md).
 
-Start with the [complete setup and launch guide](./GETTING_STARTED.md). For deployment-only instructions, see the [Railway deployment guide](./DEPLOYMENT.md). For repeatable onboarding and delivery, use the [client fulfillment SOP](./CLIENT_FULFILLMENT.md).
+Business members can start at `/workspace` for launch guidance, personal human
+handoffs, delivery warnings and evidence-based recovery results, then open the
+tenant-scoped built-in CRM. See [the product workspace review and guide](docs/PRODUCT_WORKSPACE.md).
+
+The opt-in [Agent Builder](docs/AGENT_BUILDER.md) converts natural-language requests into editable,
+versioned blueprints with missing-configuration checks, safe previews and review-gated runtime
+activation. Unsupported runtime behavior stays blocked; drafting and paid AI are disabled by
+default. See [builder verification](docs/AGENT_BUILDER_VERIFICATION.md).
+
+The opt-in universal [AI agent runtime](docs/AGENT_RUNTIME.md) supports versioned definitions,
+Autopilot/Copilot/Advisory modes, server-enforced tools, approvals and bounded execution.
+Existing recovery agents remain unchanged; real model calls and external executors are
+disabled by default. See [runtime verification](docs/AGENT_RUNTIME_VERIFICATION.md).
+
+Zapier/generic inbound and outbound integration is now available as an opt-in increment.
+See [customer setup and API contract](docs/ZAPIER_INTEGRATION.md) and
+[verification](docs/ZAPIER_VERIFICATION.md). Organization admins use `/integrations`;
+platform operators use `/admin/integrations`. Outbound sending remains disabled by default.
+
+A multi-tenant missed-call and booking automation service for home-service businesses, with lead intelligence and on-demand sales demos.
+
+The additive AI workforce foundation is disabled by default. See [architecture and migration decisions](docs/ARCHITECTURE.md), [workforce API examples](docs/WORKFORCE_API.md), and [verification results](docs/WORKFORCE_VERIFICATION.md).
+
+The canonical CRM increment supports service businesses across industries without requiring GHL. See [canonical data model](docs/CANONICAL_DATA_MODEL.md), [CRM API and admin UI](docs/CRM_API.md), and [CRM verification](docs/CRM_VERIFICATION.md). It is separately gated by `CRM_ENABLED=false`; existing production workflows remain in place.
+
+The universal event layer normalizes CRM changes and authenticated external relays into canonical, tenant-scoped facts with durable idempotency and handler receipts. See [event architecture and examples](docs/EVENT_ARCHITECTURE.md) and [event verification](docs/EVENT_VERIFICATION.md). Existing v1 imports and GHL booking support are preserved.
+
+Start with the [complete setup and launch guide](./GETTING_STARTED.md). For deployment-only instructions, see the [Railway deployment guide](./docs/DEPLOYMENT.md). For repeatable onboarding and delivery, use the [client fulfillment SOP](./CLIENT_FULFILLMENT.md).
 
 ## Prerequisites
 
@@ -212,6 +240,23 @@ curl --fail --request POST \
 External request timeouts are currently 10 seconds for Twilio SMS, 20 seconds for OpenAI/Anthropic, and 5 seconds for Zapier, GHL, and Slack. Vapi is inbound-only in this application, so there is no Vapi API request to time out; protect its inbound webhook with `VAPI_WEBHOOK_SECRET` and use `POST https://your-public-host/webhooks/vapi`. Twilio voice status callbacks should target `POST https://your-public-host/webhooks/twilio/voice-status`.
 
 ## Quality checks
+
+[Provider-independent communication](docs/COMMUNICATIONS.md) adds a canonical delivery ledger,
+hard opt-out enforcement, encrypted organization accounts and a native Twilio SMS adapter.
+Email interfaces are ready for a future provider; Recovery retains its approval/claim protocol.
+COMMUNICATIONS_ENABLED and COMMUNICATION_DELIVERY_ENABLED default off. Existing legacy send
+controls remain independent; review the rollout guide before enabling production traffic.
+
+Organization-specific [Business Knowledge](docs/BUSINESS_KNOWLEDGE.md) adds reviewed facts,
+FAQs, policies, source documents, immutable versions, cited retrieval and an admin portal.
+It defaults off via BUSINESS_KNOWLEDGE_ENABLED; knowledge never grants agent permissions.
+See its rollout guide before requiring existing recovery templates to bind approved versions.
+
+Revenue Recovery is available as a default-off specialization of the generic Agent Runtime.
+It includes a scoped dashboard, reviewed follow-ups, human handoffs, evidence-based attribution
+and 37 no-send simulation scenarios. See [the recovery guide](docs/REVENUE_RECOVERY.md) and
+[verification report](docs/REVENUE_RECOVERY_VERIFICATION.md). Live communication still requires
+a certified delivery adapter and explicit deployment/organization enablement.
 
 ```bash
 npm run typecheck

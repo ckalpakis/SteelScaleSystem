@@ -250,6 +250,8 @@ async function run(): Promise<void> {
         niche: 'plumbing',
         phone: '(919) 555-0142',
         normalizedPhone: '+19195550142',
+        // This fixture uses historical calculation times; do not mix in wall-clock updatedAt.
+        updatedAt: observedAt,
       },
     });
     const lead = await db.lead.create({ data: { clientId: client.id, businessId: business.id } });

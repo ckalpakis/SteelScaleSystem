@@ -103,6 +103,11 @@ async function run(): Promise<void> {
     assert(result.recordsDiscovered === 1, 'record should be discovered');
     assert(result.recordsImported === 1, 'record should be canonically imported');
     assert(result.scored === 1, 'affected lead should be scored');
+    const initialRun = await db.pipelineRun.findUniqueOrThrow({ where: { id: result.runId } });
+    assert(
+      result.status === 'completed',
+      `fixture pipeline must finish before replay: ${JSON.stringify(initialRun.errorSummaries)}`,
+    );
     assert(result.queuedForReview === 1, 'qualified lead should be queued for human review');
     const snapshots = await db.scoreSnapshot.count({ where: { clientId: client.id } });
     const repeated = await runLeadIntelligencePipeline(

@@ -1,14 +1,63 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { Router } from 'express';
+import { durableBackground, enqueueLegacySms } from '../platform/background.js';
 
 import { env } from '../config/env.js';
 import { processInboundSms } from '../services/sms-booking.js';
 import { processTwilioVoiceStatus } from '../services/missed-call.js';
 import type { TwilioVoiceStatusEvent } from '../types/twilio.js';
 import { logger } from '../utils/logger.js';
+import { db } from '../db/client.js';
+import { persistLegacyIngress, recordLegacyResult } from '../communications/legacy.js';
 
 export const twilioWebhookRouter = Router();
+
+twilioWebhookRouter.post('/sms-status/:deliveryId', async (request, response) => {
+  if (process.env.COMMUNICATIONS_ENABLED !== 'true') {
+    response.sendStatus(404);
+    return;
+  }
+  const body = request.body as Record<string, unknown>,
+    url = publicWebhookUrl(`/webhooks/twilio/sms-status/${String(request.params.deliveryId)}`);
+  if (
+    !body ||
+    !url ||
+    !env.TWILIO_AUTH_TOKEN ||
+    body.AccountSid !== env.TWILIO_ACCOUNT_SID ||
+    !validTwilioSignature(url, body, request.header('x-twilio-signature') ?? '')
+  ) {
+    response.sendStatus(403);
+    return;
+  }
+  const status =
+    body.MessageStatus === 'delivered'
+      ? 'delivered'
+      : ['failed', 'undelivered'].includes(String(body.MessageStatus))
+        ? 'failed'
+        : body.MessageStatus === 'sent'
+          ? 'sent'
+          : ['queued', 'accepted', 'sending'].includes(String(body.MessageStatus))
+            ? 'accepted'
+            : null;
+  const sid = stringValue(body.MessageSid);
+  if (!status || !sid || !/^[a-f0-9-]{36}$/i.test(String(request.params.deliveryId))) {
+    response.sendStatus(400);
+    return;
+  }
+  try {
+    await recordLegacyResult(
+      db,
+      String(request.params.deliveryId),
+      status,
+      sid,
+      body.ErrorCode === '21610' ? 'provider_opt_out' : null,
+    );
+    response.sendStatus(204);
+  } catch {
+    response.sendStatus(409);
+  }
+});
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -82,7 +131,7 @@ twilioWebhookRouter.post('/voice-status', async (request, response) => {
   response.sendStatus(204);
 });
 
-twilioWebhookRouter.post('/sms', (request, response) => {
+twilioWebhookRouter.post('/sms', async (request, response) => {
   const body = request.body as Record<string, unknown> | undefined;
   const messageSid = stringValue(body?.MessageSid);
   const from = stringValue(body?.From);
@@ -101,7 +150,16 @@ twilioWebhookRouter.post('/sms', (request, response) => {
     return;
   }
 
+  try {
+    await persistLegacyIngress(db, { messageSid, from, to, body: messageBody });
+    if (durableBackground())
+      await enqueueLegacySms(db, { messageSid, from, to, body: messageBody });
+  } catch {
+    response.sendStatus(503);
+    return;
+  }
   response.type('text/xml').status(200).send('<Response></Response>');
+  if (durableBackground()) return;
   setImmediate(() => {
     void processInboundSms({ messageSid, from, to, body: messageBody }).catch((error: unknown) => {
       logger.error({ error, messageSid, from, to }, 'Inbound SMS processing failed');

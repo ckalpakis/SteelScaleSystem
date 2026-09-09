@@ -2,6 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import { db } from '../db/client.js';
+import { TwilioSmsProvider } from '../communications/providers.js';
+import {
+  legacySmsBlocked,
+  recordLegacyOutbound,
+  recordLegacyResult,
+} from '../communications/legacy.js';
 
 export interface SendSmsInput {
   clientId: string;
@@ -15,9 +22,10 @@ export interface SendSmsResult {
 }
 
 export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
+  if (await legacySmsBlocked(db, input.clientId, input.to)) throw new Error('contact_opted_out');
   if (env.TWILIO_SMS_DRY_RUN) {
     const sid = `dry-run-${randomUUID()}`;
-    logger.info({ ...input, sid }, 'Twilio SMS dry run completed');
+    logger.info({ clientId: input.clientId, sid }, 'Twilio SMS dry run completed');
     return { sid };
   }
 
@@ -25,57 +33,40 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
     throw new Error('TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required to send SMS');
   }
 
-  logger.info({ from: input.from, to: input.to }, 'Sending Twilio SMS');
-
-  const credentials = Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString(
-    'base64',
+  const delivery = await recordLegacyOutbound(db, input);
+  const result = await new TwilioSmsProvider(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN).sendSms(
+    {
+      organizationId: input.clientId,
+      idempotencyKey: randomUUID(),
+      from: input.from,
+      to: input.to,
+      body: input.body,
+      ...(delivery && env.APP_URL?.startsWith('https://')
+        ? {
+            statusCallback: new URL(
+              `/webhooks/twilio/sms-status/${delivery.id}`,
+              env.APP_URL,
+            ).toString(),
+          }
+        : {}),
+    },
   );
-  let response: Response;
-  try {
-    response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(env.TWILIO_ACCOUNT_SID)}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Basic ${credentials}`,
-          'content-type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ From: input.from, To: input.to, Body: input.body }),
-        signal: AbortSignal.timeout(10_000),
-      },
+  if (result.errorCode === 'provider_opt_out')
+    await db.smsConversation.upsert({
+      where: { clientId_customerNumber: { clientId: input.clientId, customerNumber: input.to } },
+      create: { clientId: input.clientId, customerNumber: input.to, status: 'opted_out' },
+      update: { status: 'opted_out' },
+    });
+  if (delivery)
+    await recordLegacyResult(
+      db,
+      delivery.id,
+      result.status === 'not_sent' ? 'failed' : result.status,
+      result.externalId,
+      result.errorCode ?? null,
     );
-  } catch (error: unknown) {
-    logger.error(
-      { err: error, clientId: input.clientId, attempted: 'twilio_sms', to: input.to },
-      'Twilio API request failed',
-    );
-    throw error;
-  }
-
-  const responseBody: unknown = await response.json();
-
-  if (!response.ok) {
-    logger.error(
-      { clientId: input.clientId, attempted: 'twilio_sms', to: input.to, status: response.status },
-      'Twilio API rejected SMS',
-    );
-    throw new Error(
-      `Twilio SMS request failed (${response.status}): ${JSON.stringify(responseBody)}`,
-    );
-  }
-
-  if (
-    !responseBody ||
-    typeof responseBody !== 'object' ||
-    !('sid' in responseBody) ||
-    typeof responseBody.sid !== 'string'
-  ) {
-    throw new Error('Twilio SMS response did not contain a message SID');
-  }
-
-  logger.info(
-    { clientId: input.clientId, messageSid: responseBody.sid, to: input.to },
-    'Twilio SMS accepted',
-  );
-  return { sid: responseBody.sid };
+  if (!result.externalId || !['accepted', 'delivered'].includes(result.status))
+    throw new Error(result.errorCode ?? 'sms_not_accepted');
+  logger.info({ clientId: input.clientId, messageSid: result.externalId }, 'Twilio SMS accepted');
+  return { sid: result.externalId };
 }
