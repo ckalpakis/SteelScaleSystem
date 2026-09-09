@@ -299,8 +299,20 @@ export async function runLeadIntelligencePipeline(
       data: { currentStage: 'ENRICH', heartbeatAt: new Date() },
     });
     if (campaign.source === 'outscraper_google_maps') {
-      const auditable = affectedLeads.filter((lead): lead is typeof lead & { businessId: string } =>
-        Boolean(lead.businessId),
+      // No website is a valid business attribute, not an enrichment failure. Trying to audit it
+      // left otherwise completed pipelines partial, causing duplicate scoring on replay.
+      const businessesWithWebsites = await db.prospectBusiness.findMany({
+        where: {
+          clientId: campaign.clientId,
+          id: { in: affectedLeads.flatMap((lead) => (lead.businessId ? [lead.businessId] : [])) },
+          website: { not: null },
+        },
+        select: { id: true },
+      });
+      const websiteIds = new Set(businessesWithWebsites.map((business) => business.id));
+      const auditable = affectedLeads.filter(
+        (lead): lead is typeof lead & { businessId: string } =>
+          !!lead.businessId && websiteIds.has(lead.businessId),
       );
       const audits = await mapConcurrent(
         auditable,

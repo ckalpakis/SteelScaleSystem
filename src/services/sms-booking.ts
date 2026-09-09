@@ -8,6 +8,7 @@ import { spokenAvailabilitySlots } from './availability-format.js';
 import { getChatbotReply } from './chatbot-llm.js';
 import { checkClientAvailability } from './client-availability.js';
 import { sendSms } from './twilio-sms.js';
+import { bridgeLegacyInbound, isOptOut } from '../communications/legacy.js';
 
 const STOP_WORDS = new Set(['stop', 'stopall', 'unsubscribe', 'cancel', 'end', 'quit']);
 const START_WORDS = new Set(['start', 'unstop']);
@@ -74,21 +75,14 @@ async function recordAndSend(input: {
     throw error;
   }
 
-  try {
-    const sent = await sendSms({
-      clientId: input.clientId,
-      from: input.from,
-      to: input.to,
-      body: input.body,
-    });
-    await db.smsMessage.update({
-      where: { id: message.id },
-      data: { providerMessageId: sent.sid },
-    });
-  } catch (error) {
-    await db.smsMessage.delete({ where: { id: message.id } }).catch(() => undefined);
-    throw error;
-  }
+  // Preserve the attempt/dedupe fence on failure: exceptions may follow provider acceptance.
+  const sent = await sendSms({
+    clientId: input.clientId,
+    from: input.from,
+    to: input.to,
+    body: input.body,
+  });
+  await db.smsMessage.update({ where: { id: message.id }, data: { providerMessageId: sent.sid } });
 }
 
 export async function sendNoBookingSmsFollowUp(input: {
@@ -125,7 +119,9 @@ export async function sendNoBookingSmsFollowUp(input: {
 
 export async function processInboundSms(input: InboundSmsInput): Promise<void> {
   const client = await db.client.findUnique({ where: { phoneNumber: input.to } });
-  if (!client?.smsBookingEnabled) {
+  if (!client) return;
+  await bridgeLegacyInbound(db, client.id, input);
+  if (!client.smsBookingEnabled && !isOptOut(input.body)) {
     logger.info({ to: input.to, messageSid: input.messageSid }, 'Inbound SMS booking disabled');
     return;
   }
@@ -150,7 +146,7 @@ export async function processInboundSms(input: InboundSmsInput): Promise<void> {
   }
 
   const command = normalizedCommand(input.body);
-  if (STOP_WORDS.has(command)) {
+  if (STOP_WORDS.has(command) || isOptOut(input.body)) {
     await db.smsConversation.update({
       where: { id: conversation.id },
       data: { status: SmsConversationStatus.opted_out },

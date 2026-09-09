@@ -1,5 +1,9 @@
 # Railway deployment guide
 
+For the current multi-service platform, follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Its migration, worker, Redis, readiness and staged-cutover instructions supersede the older
+single-service setup below. Provider onboarding sections below remain useful.
+
 Railway is the recommended host for this project. The application and PostgreSQL database can live in one project, `DATABASE_URL` can reference the database service directly, and Railway supports a migration command before each release.
 
 No deployment is performed by this repository. Complete the following steps in your own accounts.
@@ -57,11 +61,13 @@ Then open **Settings**:
 1. Under **Build**, set the build command to `npm run build` if Railway has not already picked it up.
 2. Under **Deploy**, set **Pre-deploy Command** to `npm run prisma:deploy`.
 3. Set **Custom Start Command** to `npm run start`.
-4. Set **Healthcheck Path** to `/health` and the timeout to `120` seconds.
+4. Set **Healthcheck Path** to `/ready` and the timeout to `120` seconds.
 5. Leave restart policy at **On Failure**.
 6. Apply the staged changes and deploy.
 
-The checked-in `railway.json` records the same settings for legacy Config-as-Code support. Railway is deprecating that file for new services, so the dashboard settings above are the authoritative setup for a new project.
+The checked-in `railway.json` records these web settings. Configure the separate worker with
+`railway.workforce.json`; inspect effective config-as-code/dashboard values as described in
+the current deployment guide.
 
 ## 4. Generate and verify the public URL
 

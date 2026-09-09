@@ -5,6 +5,8 @@ import { logger } from '../../utils/logger.js';
 import { runLeadIntelligencePipeline } from './orchestrator.js';
 import { configuredLeadDiscoveryProviders } from './scheduler.js';
 import type { PipelineCampaign } from './types.js';
+import { durableBackground, enqueueBackground } from '../../platform/background.js';
+import { hash } from '../../workforce/shared.js';
 
 const activeRuns = new Set<string>();
 
@@ -55,8 +57,16 @@ export async function enqueueLeadIntelligencePipeline(
   campaign: PipelineCampaign,
   idempotencyKey: string,
 ): Promise<string> {
-  const run = await db.pipelineRun.create({
-    data: {
+  const run = await db.pipelineRun.upsert({
+    where: {
+      clientId_source_idempotencyKey: {
+        clientId: campaign.clientId,
+        source: campaign.source,
+        idempotencyKey,
+      },
+    },
+    update: {},
+    create: {
       clientId: campaign.clientId,
       source: campaign.source,
       campaignKey: campaign.key,
@@ -67,11 +77,15 @@ export async function enqueueLeadIntelligencePipeline(
       configuration: asJson(campaign),
     },
   });
-  launch(run.id, campaign, idempotencyKey);
+  if (hash(run.configuration) !== hash(campaign)) throw new Error('Pipeline idempotency conflict');
+  if (durableBackground())
+    await enqueueBackground(db, 'lead_pipeline', run.id, { runId: run.id }, run.clientId);
+  else launch(run.id, campaign, idempotencyKey);
   return run.id;
 }
 
 export async function resumeInterruptedLeadPipelines(): Promise<number> {
+  if (durableBackground()) return 0;
   const runs = await db.pipelineRun.findMany({
     where: { status: { in: ['pending', 'running'] }, configuration: { not: Prisma.JsonNull } },
     orderBy: { createdAt: 'asc' },
